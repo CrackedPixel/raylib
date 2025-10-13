@@ -27,7 +27,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2013-2024 Ramon Santamaria (@raysan5) and contributors
+*   Copyright (c) 2013-2025 Ramon Santamaria (@raysan5) and contributors
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -114,7 +114,7 @@ void MinimizeWindow(void)
     TRACELOG(LOG_WARNING, "MinimizeWindow() not available on target platform");
 }
 
-// Set window state: not minimized/maximized
+// Restore window from being minimized/maximized
 void RestoreWindow(void)
 {
     TRACELOG(LOG_WARNING, "RestoreWindow() not available on target platform");
@@ -208,7 +208,7 @@ int GetMonitorCount(void)
     return 1;
 }
 
-// Get number of monitors
+// Get current monitor where window is placed
 int GetCurrentMonitor(void)
 {
     TRACELOG(LOG_WARNING, "GetCurrentMonitor() not implemented on target platform");
@@ -292,6 +292,16 @@ const char *GetClipboardText(void)
     return NULL;
 }
 
+// Get clipboard image
+Image GetClipboardImage(void)
+{
+    Image image = { 0 };
+
+    TRACELOG(LOG_WARNING, "GetClipboardImage() not implemented on target platform");
+
+    return image;
+}
+
 // Show mouse cursor
 void ShowCursor(void)
 {
@@ -371,6 +381,12 @@ int SetGamepadMappings(const char *mappings)
     return 0;
 }
 
+// Set gamepad vibration
+void SetGamepadVibration(int gamepad, float leftMotor, float rightMotor, float duration)
+{
+    TRACELOG(LOG_WARNING, "SetGamepadVibration() not implemented on target platform");
+}
+
 // Set mouse position XY
 void SetMousePosition(int x, int y)
 {
@@ -429,7 +445,6 @@ void PollInputEvents(void)
 
     // TODO: Poll input events for current platform
 }
-
 
 //----------------------------------------------------------------------------------
 // Module Internal Functions Definition

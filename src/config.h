@@ -6,7 +6,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2018-2024 Ahmad Fatoum & Ramon Santamaria (@raysan5)
+*   Copyright (c) 2018-2025 Ahmad Fatoum & Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -71,6 +71,30 @@
 // Enabling this flag allows manual control of the frame processes, use at your own risk
 //#define SUPPORT_CUSTOM_FRAME_CONTROL    1
 
+// Support for clipboard image loading
+// NOTE: Only working on SDL3, GLFW (Windows) and RGFW (Windows)
+#define SUPPORT_CLIPBOARD_IMAGE    1
+
+// NOTE: Clipboard image loading requires support for some image file formats
+// TODO: Those defines should probably be removed from here, I prefer to let the user manage them
+#if defined(SUPPORT_CLIPBOARD_IMAGE)
+    #ifndef SUPPORT_MODULE_RTEXTURES
+        #define SUPPORT_MODULE_RTEXTURES 1
+    #endif
+    #ifndef STBI_REQUIRED
+        #define STBI_REQUIRED
+    #endif
+    #ifndef SUPPORT_FILEFORMAT_BMP // For clipboard image on Windows
+        #define SUPPORT_FILEFORMAT_BMP 1
+    #endif
+    #ifndef SUPPORT_FILEFORMAT_PNG // Wayland uses png for prints, at least it was on 22 LTS ubuntu
+        #define SUPPORT_FILEFORMAT_PNG 1
+    #endif
+    #ifndef SUPPORT_FILEFORMAT_JPG
+        #define SUPPORT_FILEFORMAT_JPG 1
+    #endif
+#endif
+
 // rcore: Configuration values
 //------------------------------------------------------------------------------------
 #define MAX_FILEPATH_CAPACITY        8192       // Maximum file paths capacity
@@ -79,7 +103,7 @@
 #define MAX_KEYBOARD_KEYS             512       // Maximum number of keyboard keys supported
 #define MAX_MOUSE_BUTTONS               8       // Maximum number of mouse buttons supported
 #define MAX_GAMEPADS                    4       // Maximum number of gamepads supported
-#define MAX_GAMEPAD_AXIS                8       // Maximum number of axis supported (per gamepad)
+#define MAX_GAMEPAD_AXES                8       // Maximum number of axes supported (per gamepad)
 #define MAX_GAMEPAD_BUTTONS            32       // Maximum number of buttons supported (per gamepad)
 #define MAX_GAMEPAD_VIBRATION_TIME      2.0f    // Maximum vibration time in seconds
 #define MAX_TOUCH_POINTS                8       // Maximum number of touch points supported
@@ -100,6 +124,8 @@
 // Show OpenGL extensions and capabilities detailed logs on init
 //#define RLGL_SHOW_GL_DETAILS_INFO              1
 
+#define RL_SUPPORT_MESH_GPU_SKINNING           1      // GPU skinning, comment if your GPU does not support more than 8 VBOs
+
 //#define RL_DEFAULT_BATCH_BUFFER_ELEMENTS    4096    // Default internal render batch elements limits
 #define RL_DEFAULT_BATCH_BUFFERS               1      // Default number of batch buffers (multi-buffering)
 #define RL_DEFAULT_BATCH_DRAWCALLS           256      // Default number of batch draw calls (by state changes: mode, texture)
@@ -109,8 +135,8 @@
 
 #define RL_MAX_SHADER_LOCATIONS               32      // Maximum number of shader locations supported
 
-#define RL_CULL_DISTANCE_NEAR               0.01      // Default projection matrix near cull distance
-#define RL_CULL_DISTANCE_FAR              1000.0      // Default projection matrix far cull distance
+#define RL_CULL_DISTANCE_NEAR              0.05       // Default projection matrix near cull distance
+#define RL_CULL_DISTANCE_FAR             4000.0       // Default projection matrix far cull distance
 
 // Default shader vertex attribute locations
 #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION    0
@@ -120,15 +146,11 @@
 #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_TANGENT     4
 #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD2   5
 #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES     6
-
-
-#define RL_SUPPORT_MESH_GPU_SKINNING                   // Remove this if your GPU does not support more than 8 VBOs
-
-#ifdef RL_SUPPORT_MESH_GPU_SKINNING
-#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS     7
-#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS 8
+#if defined(RL_SUPPORT_MESH_GPU_SKINNING)
+    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS     7
+    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS 8
 #endif
-
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_INSTANCE_TX 9
 
 // Default shader vertex attribute names to set location points
 // NOTE: When a new shader is loaded, the following locations are tried to be set for convenience
@@ -149,7 +171,6 @@
 #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1  "texture1"          // texture1 (texture slot active 1)
 #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2  "texture2"          // texture2 (texture slot active 2)
 
-
 //------------------------------------------------------------------------------------
 // Module: rshapes - Configuration Flags
 //------------------------------------------------------------------------------------
@@ -161,11 +182,10 @@
 //------------------------------------------------------------------------------------
 #define SPLINE_SEGMENT_DIVISIONS       24       // Spline segments subdivisions
 
-
 //------------------------------------------------------------------------------------
 // Module: rtextures - Configuration Flags
 //------------------------------------------------------------------------------------
-// Selecte desired fileformats to be supported for image data loading
+// Selected desired fileformats to be supported for image data loading
 #define SUPPORT_FILEFORMAT_PNG      1
 //#define SUPPORT_FILEFORMAT_BMP      1
 //#define SUPPORT_FILEFORMAT_TGA      1
@@ -180,7 +200,6 @@
 //#define SUPPORT_FILEFORMAT_ASTC     1
 //#define SUPPORT_FILEFORMAT_PKM      1
 //#define SUPPORT_FILEFORMAT_PVR      1
-//#define SUPPORT_FILEFORMAT_SVG      1
 
 // Support image export functionality (.png, .bmp, .tga, .jpg, .qoi)
 #define SUPPORT_IMAGE_EXPORT            1
@@ -189,7 +208,6 @@
 // Support multiple image editing functions to scale, adjust colors, flip, draw on images, crop...
 // If not defined, still some functions are supported: ImageFormat(), ImageCrop(), ImageToPOT()
 #define SUPPORT_IMAGE_MANIPULATION      1
-
 
 //------------------------------------------------------------------------------------
 // Module: rtext - Configuration Flags
@@ -211,12 +229,14 @@
 // drawing text and shapes with a single draw call [SetShapesTexture()].
 #define SUPPORT_FONT_ATLAS_WHITE_REC    1
 
+// Support conservative font atlas size estimation
+//#define SUPPORT_FONT_ATLAS_SIZE_CONSERVATIVE    1
+
 // rtext: Configuration values
 //------------------------------------------------------------------------------------
 #define MAX_TEXT_BUFFER_LENGTH       1024       // Size of internal static buffers used on some functions:
                                                 // TextFormat(), TextSubtext(), TextToUpper(), TextToLower(), TextToPascal(), TextSplit()
 #define MAX_TEXTSPLIT_COUNT           128       // Maximum number of substrings to split: TextSplit()
-
 
 //------------------------------------------------------------------------------------
 // Module: rmodels - Configuration Flags

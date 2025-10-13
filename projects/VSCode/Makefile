@@ -117,11 +117,11 @@ endif
 
 ifeq ($(PLATFORM),PLATFORM_WEB)
     # Emscripten required variables
-    EMSDK_PATH         ?= C:/emsdk
+    EMSDK_PATH         ?= C:/raylib/emsdk
     EMSCRIPTEN_PATH    ?= $(EMSDK_PATH)/upstream/emscripten
     CLANG_PATH          = $(EMSDK_PATH)/upstream/bin
-    PYTHON_PATH         = $(EMSDK_PATH)/python/3.9.2-1_64bit
-    NODE_PATH           = $(EMSDK_PATH)/node/14.18.2_64bit/bin
+    PYTHON_PATH         = $(EMSDK_PATH)/python/3.9.2-nuget_64bit
+    NODE_PATH           = $(EMSDK_PATH)/node/20.18.0_64bit/bin
     export PATH         = $(EMSDK_PATH);$(EMSCRIPTEN_PATH);$(CLANG_PATH);$(NODE_PATH);$(PYTHON_PATH):$$(PATH)
 endif
 
@@ -225,21 +225,23 @@ endif
 ifeq ($(PLATFORM),PLATFORM_WEB)
     # -Os                        # size optimization
     # -O2                        # optimization level 2, if used, also set --memory-init-file 0
-    # -s USE_GLFW=3              # Use glfw3 library (context/input management)
-    # -s ALLOW_MEMORY_GROWTH=1   # to allow memory resizing -> WARNING: Audio buffers could FAIL!
-    # -s TOTAL_MEMORY=16777216   # to specify heap memory size (default = 16MB)
-    # -s USE_PTHREADS=1          # multithreading support
-    # -s WASM=0                  # disable Web Assembly, emitted by default
-    # -s EMTERPRETIFY=1          # enable emscripten code interpreter (very slow)
-    # -s EMTERPRETIFY_ASYNC=1    # support synchronous loops by emterpreter
-    # -s FORCE_FILESYSTEM=1      # force filesystem to load/save files data
-    # -s ASSERTIONS=1            # enable runtime checks for common memory allocation errors (-O1 and above turn it off)
+    # -sUSE_GLFW=3               # Use glfw3 library (context/input management)
+    # -sALLOW_MEMORY_GROWTH=1    # to allow memory resizing -> WARNING: Audio buffers could FAIL!
+    # -sTOTAL_MEMORY=16777216    # to specify heap memory size (default = 16MB) (67108864 = 64MB)
+    # -sUSE_PTHREADS=1           # multithreading support
+    # -sWASM=0                   # disable Web Assembly, emitted by default
+    # -sASYNCIFY                 # lets synchronous C/C++ code interact with asynchronous JS
+    # -sFORCE_FILESYSTEM=1       # force filesystem to load/save files data
+    # -sASSERTIONS=1             # enable runtime checks for common memory allocation errors (-O1 and above turn it off)
+    # -sMINIFY_HTML=0            # minify generated html from shell.html
     # --profiling                # include information for code profiling
     # --memory-init-file 0       # to avoid an external memory initialization code file (.mem)
     # --preload-file resources   # specify a resources folder for data compilation
-    CFLAGS += -Os -s USE_GLFW=3 -s TOTAL_MEMORY=16777216 --preload-file resources
+    # --source-map-base          # allow debugging in browser with source map
+    # --shell-file shell.html    # define a custom shell .html and output extension
+    CFLAGS += -Os -sUSE_GLFW=3 -sTOTAL_MEMORY=16777216 --preload-file resources -sMINIFY_HTML=0
     ifeq ($(BUILD_MODE), DEBUG)
-        CFLAGS += -s ASSERTIONS=1 --profiling
+        CFLAGS += -sASSERTIONS=1 --profiling
     endif
 
     # Define a custom shell .html and output extension
@@ -352,9 +354,9 @@ SRC_DIR = src
 OBJ_DIR = obj
 
 # Define all object files from source files
-SRC = $(call rwildcard, *.c, *.h)
+SRC = $(call rwildcard, ./, *.c, *.h)
 #OBJS = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
-OBJS ?= main.c
+OBJS = $(patsubst %.c,%.o,$(filter %.c,$(SRC)))
 
 # For Android platform we call a custom Makefile.Android
 ifeq ($(PLATFORM),PLATFORM_ANDROID)
