@@ -69,9 +69,14 @@ int main(void)
     float offset[2] = { startingOffset[0], startingOffset[1] };
     float zoom = startingZoom;
     // Depending on the zoom the mximum number of iterations must be adapted to get more detail as we zzoom in
-	// The solution is not perfect, so a control has been added to increase/decrease the number of iterations with UP/DOWN keys
+    // The solution is not perfect, so a control has been added to increase/decrease the number of iterations with UP/DOWN keys
+#if defined(PLATFORM_DESKTOP)
     int maxIterations = 333;
     float maxIterationsMultiplier = 166.5f;
+#else
+    int maxIterations = 43;
+    float maxIterationsMultiplier = 22.0f;
+#endif
 
     // Get variable (uniform) locations on the shader to connect with the program
     // NOTE: If uniform variable could not be found in the shader, function returns -1
@@ -129,8 +134,8 @@ int main(void)
 
         if (IsKeyPressed(KEY_F1)) showControls = !showControls;  // Toggle whether or not to show controls
 
-		// Change number of max iterations with UP and DOWN keys
-		// WARNING: Increasing the number of max iterations greatly impacts performance
+        // Change number of max iterations with UP and DOWN keys
+        // WARNING: Increasing the number of max iterations greatly impacts performance
         if (IsKeyPressed(KEY_UP))
         {
             maxIterationsMultiplier *= 1.4f;
@@ -162,10 +167,10 @@ int main(void)
             updateShader = true;
         }
 
-		// In case a parameter has been changed, update the shader values
+        // In case a parameter has been changed, update the shader values
         if (updateShader)
-		{
-			// As we zoom in, increase the number of max iterations to get more detail
+        {
+            // As we zoom in, increase the number of max iterations to get more detail
             // Aproximate formula, but it works-ish
             maxIterations = (int)(sqrtf(2.0f*sqrtf(fabsf(1.0f - sqrtf(37.5f*zoom))))*maxIterationsMultiplier);
 
