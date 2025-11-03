@@ -1,3 +1,4 @@
+#include <stdio.h>
 /**********************************************************************************************
 *
 *   rshapes - Basic functions to draw 2d shapes and check collisions

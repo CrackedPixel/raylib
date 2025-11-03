@@ -4140,6 +4140,9 @@ Texture2D LoadTextureFromImage(Image image)
 
     if ((image.width != 0) && (image.height != 0))
     {
+        #ifdef PLATFORM_3DS
+            ImageToPOT(&image, (Color){ 0, 0, 0, 0 });
+        #endif
         texture.id = rlLoadTexture(image.data, image.width, image.height, image.format, image.mipmaps);
     }
     else TRACELOG(LOG_WARNING, "IMAGE: Data is not valid to load texture");

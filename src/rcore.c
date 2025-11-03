@@ -1,3 +1,4 @@
+#define PLATFORM_3DS 1
 /**********************************************************************************************
 *
 *   rcore - Window/display management, Graphic device/context management and input management
@@ -134,15 +135,6 @@
     #include "rcamera.h"            // Camera system functionality
 #endif
 
-#if defined(SUPPORT_GIF_RECORDING)
-    #define MSF_GIF_MALLOC(contextPointer, newSize) RL_MALLOC(newSize)
-    #define MSF_GIF_REALLOC(contextPointer, oldMemory, oldSize, newSize) RL_REALLOC(oldMemory, newSize)
-    #define MSF_GIF_FREE(contextPointer, oldMemory, oldSize) RL_FREE(oldMemory)
-
-    #define MSF_GIF_IMPL
-    #include "external/msf_gif.h"   // GIF recording functionality
-#endif
-
 #if defined(SUPPORT_COMPRESSION_API)
     #define SINFL_IMPLEMENTATION
     #define SINFL_NO_SIMD
@@ -234,7 +226,7 @@ __declspec(dllimport) unsigned int __stdcall timeEndPeriod(unsigned int uPeriod)
 #endif
 
 #ifndef MAX_KEYBOARD_KEYS
-    #define MAX_KEYBOARD_KEYS            512        // Maximum number of keyboard keys supported
+    #define MAX_KEYBOARD_KEYS            64        // Maximum number of keyboard keys supported
 #endif
 #ifndef MAX_MOUSE_BUTTONS
     #define MAX_MOUSE_BUTTONS              8        // Maximum number of mouse buttons supported
@@ -397,16 +389,6 @@ CoreData CORE = { 0 };                      // Global CORE state context
 // referenced from other modules to support GPU data loading
 // NOTE: Useful to allow Texture, RenderTexture, Font.texture, Mesh.vaoId/vboId, Shader loading
 bool isGpuReady = false;
-
-#if defined(SUPPORT_SCREEN_CAPTURE)
-static int screenshotCounter = 0;           // Screenshots counter
-#endif
-
-#if defined(SUPPORT_GIF_RECORDING)
-static unsigned int gifFrameCounter = 0;    // GIF frames counter
-static bool gifRecording = false;           // GIF recording state
-static MsfGifState gifState = { 0 };        // MSGIF context state
-#endif
 
 #if defined(SUPPORT_AUTOMATION_EVENTS)
 // Automation events type
@@ -571,10 +553,16 @@ const char *TextFormat(const char *text, ...); // Formatting of text with variab
     #include "platforms/rcore_drm.c"
 #elif defined(PLATFORM_ANDROID)
     #include "platforms/rcore_android.c"
+#elif defined(PLATFORM_3DS)
+    #include "platforms/rcore_3ds.c"
 #else
     // TODO: Include your custom platform backend!
     // i.e software rendering backend or console backend!
     #pragma message ("WARNING: No [rcore] platform defined")
+#endif
+
+#ifdef PLATFORM_3DS
+    #include "3ds.h"
 #endif
 
 //----------------------------------------------------------------------------------
@@ -645,6 +633,8 @@ void InitWindow(int width, int height, const char *title)
     TRACELOG(LOG_INFO, "Platform backend: NATIVE DRM");
 #elif defined(PLATFORM_ANDROID)
     TRACELOG(LOG_INFO, "Platform backend: ANDROID");
+#elif defined(PLATFORM_3DS)
+    TRACELOG(LOG_INFO, "Platform backend: 3DS");
 #else
     // TODO: Include your custom platform backend!
     // i.e software rendering backend or console backend!
@@ -692,7 +682,6 @@ void InitWindow(int width, int height, const char *title)
 
     // Initialize global input state
     memset(&CORE.Input, 0, sizeof(CORE.Input)); // Reset CORE.Input structure to 0
-    CORE.Input.Keyboard.exitKey = KEY_ESCAPE;
     CORE.Input.Mouse.scale = (Vector2){ 1.0f, 1.0f };
     CORE.Input.Mouse.cursor = MOUSE_CURSOR_ARROW;
     CORE.Input.Gamepad.lastButtonPressed = GAMEPAD_BUTTON_UNKNOWN;
@@ -758,14 +747,6 @@ void InitWindow(int width, int height, const char *title)
 // Close window and unload OpenGL context
 void CloseWindow(void)
 {
-#if defined(SUPPORT_GIF_RECORDING)
-    if (gifRecording)
-    {
-        MsfGifResult result = msf_gif_end(&gifState);
-        msf_gif_free(result);
-        gifRecording = false;
-    }
-#endif
 
 #if defined(SUPPORT_MODULE_RTEXT) && defined(SUPPORT_DEFAULT_FONT)
     UnloadFontDefault();        // WARNING: Module required: rtext
@@ -929,47 +910,6 @@ void EndDrawing(void)
 {
     rlDrawRenderBatchActive();      // Update and draw internal render batch
 
-#if defined(SUPPORT_GIF_RECORDING)
-    // Draw record indicator
-    if (gifRecording)
-    {
-        #ifndef GIF_RECORD_FRAMERATE
-        #define GIF_RECORD_FRAMERATE    10
-        #endif
-        gifFrameCounter += (unsigned int)(GetFrameTime()*1000);
-
-        // NOTE: We record one gif frame depending on the desired gif framerate
-        if (gifFrameCounter > 1000/GIF_RECORD_FRAMERATE)
-        {
-            // Get image data for the current frame (from backbuffer)
-            // NOTE: This process is quite slow... :(
-            Vector2 scale = GetWindowScaleDPI();
-            unsigned char *screenData = rlReadScreenPixels((int)((float)CORE.Window.render.width*scale.x), (int)((float)CORE.Window.render.height*scale.y));
-
-            #ifndef GIF_RECORD_BITRATE
-            #define GIF_RECORD_BITRATE 16
-            #endif
-
-            // Add the frame to the gif recording, given how many frames have passed in centiseconds
-            msf_gif_frame(&gifState, screenData, gifFrameCounter/10, GIF_RECORD_BITRATE, (int)((float)CORE.Window.render.width*scale.x)*4);
-            gifFrameCounter -= 1000/GIF_RECORD_FRAMERATE;
-
-            RL_FREE(screenData);    // Free image data
-        }
-
-    #if defined(SUPPORT_MODULE_RSHAPES) && defined(SUPPORT_MODULE_RTEXT)
-        // Display the recording indicator every half-second
-        if ((int)(GetTime()/0.5)%2 == 1)
-        {
-            DrawCircle(30, CORE.Window.screen.height - 20, 10, MAROON);                 // WARNING: Module required: rshapes
-            DrawText("GIF RECORDING", 50, CORE.Window.screen.height - 25, 10, RED);     // WARNING: Module required: rtext
-        }
-    #endif
-
-        rlDrawRenderBatchActive();  // Update and draw internal render batch
-    }
-#endif
-
 #if defined(SUPPORT_AUTOMATION_EVENTS)
     if (automationEventRecording) RecordAutomationEvent();    // Event recording
 #endif
@@ -999,43 +939,11 @@ void EndDrawing(void)
     PollInputEvents();      // Poll user events (before next frame update)
 #endif
 
-#if defined(SUPPORT_SCREEN_CAPTURE)
-    if (IsKeyPressed(KEY_F12))
-    {
-#if defined(SUPPORT_GIF_RECORDING)
-        if (IsKeyDown(KEY_LEFT_CONTROL))
-        {
-            if (gifRecording)
-            {
-                gifRecording = false;
-
-                MsfGifResult result = msf_gif_end(&gifState);
-
-                SaveFileData(TextFormat("%s/screenrec%03i.gif", CORE.Storage.basePath, screenshotCounter), result.data, (unsigned int)result.dataSize);
-                msf_gif_free(result);
-
-                TRACELOG(LOG_INFO, "SYSTEM: Finish animated GIF recording");
-            }
-            else
-            {
-                gifRecording = true;
-                gifFrameCounter = 0;
-
-                Vector2 scale = GetWindowScaleDPI();
-                msf_gif_begin(&gifState, (int)((float)CORE.Window.render.width*scale.x), (int)((float)CORE.Window.render.height*scale.y));
-                screenshotCounter++;
-
-                TRACELOG(LOG_INFO, "SYSTEM: Start animated GIF recording: %s", TextFormat("screenrec%03i.gif", screenshotCounter));
-            }
-        }
-        else
-#endif  // SUPPORT_GIF_RECORDING
-        {
-            TakeScreenshot(TextFormat("screenshot%03i.png", screenshotCounter));
-            screenshotCounter++;
-        }
-    }
-#endif  // SUPPORT_SCREEN_CAPTURE
+    #ifdef PLATFORM_3DS
+        glFlush();
+        pglSwapBuffers();
+        gspWaitForVBlank();
+    #endif
 
     CORE.Time.frameCounter++;
 }
@@ -3429,14 +3337,6 @@ void PlayAutomationEvent(AutomationEvent event)
             case WINDOW_MINIMIZE: MinimizeWindow(); break;
             case WINDOW_RESIZE: SetWindowSize(event.params[0], event.params[1]); break;
 
-            // Custom event
-    #if defined(SUPPORT_SCREEN_CAPTURE)
-            case ACTION_TAKE_SCREENSHOT:
-            {
-                TakeScreenshot(TextFormat("screenshot%03i.png", screenshotCounter));
-                screenshotCounter++;
-            } break;
-    #endif
             case ACTION_SETTARGETFPS: SetTargetFPS(event.params[0]); break;
             default: break;
         }
@@ -3456,7 +3356,7 @@ bool IsKeyPressed(int key)
 
     bool pressed = false;
 
-    if ((key > 0) && (key < MAX_KEYBOARD_KEYS))
+    if ((key >= 0) && (key < MAX_KEYBOARD_KEYS))
     {
         if ((CORE.Input.Keyboard.previousKeyState[key] == 0) && (CORE.Input.Keyboard.currentKeyState[key] == 1)) pressed = true;
     }
@@ -3469,7 +3369,7 @@ bool IsKeyPressedRepeat(int key)
 {
     bool repeat = false;
 
-    if ((key > 0) && (key < MAX_KEYBOARD_KEYS))
+    if ((key >= 0) && (key < MAX_KEYBOARD_KEYS))
     {
         if (CORE.Input.Keyboard.keyRepeatInFrame[key] == 1) repeat = true;
     }
@@ -3482,7 +3382,7 @@ bool IsKeyDown(int key)
 {
     bool down = false;
 
-    if ((key > 0) && (key < MAX_KEYBOARD_KEYS))
+    if ((key >= 0) && (key < MAX_KEYBOARD_KEYS))
     {
         if (CORE.Input.Keyboard.currentKeyState[key] == 1) down = true;
     }
@@ -3495,7 +3395,7 @@ bool IsKeyReleased(int key)
 {
     bool released = false;
 
-    if ((key > 0) && (key < MAX_KEYBOARD_KEYS))
+    if ((key >= 0) && (key < MAX_KEYBOARD_KEYS))
     {
         if ((CORE.Input.Keyboard.previousKeyState[key] == 1) && (CORE.Input.Keyboard.currentKeyState[key] == 0)) released = true;
     }
@@ -3508,7 +3408,7 @@ bool IsKeyUp(int key)
 {
     bool up = false;
 
-    if ((key > 0) && (key < MAX_KEYBOARD_KEYS))
+    if ((key >= 0) && (key < MAX_KEYBOARD_KEYS))
     {
         if (CORE.Input.Keyboard.currentKeyState[key] == 0) up = true;
     }

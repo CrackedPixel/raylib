@@ -1062,7 +1062,7 @@ RLAPI void rlLoadDrawQuad(void);     // Load and draw a quad
 //----------------------------------------------------------------------------------
 // Module Types and Structures Definition
 //----------------------------------------------------------------------------------
-#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_11)
 
 typedef void *(*rlglLoadProc)(const char *name);   // OpenGL extension functions loader signature (same as GLADloadproc)
 
@@ -1150,7 +1150,7 @@ typedef struct rlglData {
 static double rlCullDistanceNear = RL_CULL_DISTANCE_NEAR;
 static double rlCullDistanceFar = RL_CULL_DISTANCE_FAR;
 
-#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_11)
 static rlglData RLGL = { 0 };
 #endif  // GRAPHICS_API_OPENGL_33 || GRAPHICS_API_OPENGL_ES2
 
@@ -2025,6 +2025,7 @@ void rlDisablePointMode(void)
 #endif
 }
 
+#ifndef PLATFORM_3DS
 // Set the line drawing width
 void rlSetLineWidth(float width) { glLineWidth(width); }
 
@@ -2052,7 +2053,6 @@ float rlGetPointSize(void)
     glGetFloatv(GL_POINT_SIZE, &size);
 #endif
     return size;
-
 }
 
 // Enable line aliasing
@@ -2070,6 +2070,7 @@ void rlDisableSmoothLines(void)
     glDisable(GL_LINE_SMOOTH);
 #endif
 }
+#endif
 
 // Enable stereo rendering
 void rlEnableStereoRender(void)
@@ -2106,7 +2107,11 @@ void rlClearColor(unsigned char r, unsigned char g, unsigned char b, unsigned ch
     float cb = (float)b/255;
     float ca = (float)a/255;
 
-    glClearColor(cr, cg, cb, ca);
+    #ifdef PLATFORM_3DS
+        glClearColor(cr, cb, cg, ca);
+    #else
+        glClearColor(cr, cg, cb, ca);
+    #endif
 }
 
 // Clear used screen buffers (color and depth)
@@ -2300,34 +2305,34 @@ void rlglInit(int width, int height)
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     // Init default white texture
-    unsigned char pixels[4] = { 255, 255, 255, 255 };   // 1 pixel RGBA (4 bytes)
-    RLGL.State.defaultTextureId = rlLoadTexture(pixels, 1, 1, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
-    RLGL.State.currentTextureId = RLGL.State.defaultTextureId;
+    // unsigned char pixels[4] = { 255, 255, 255, 255 };   // 1 pixel RGBA (4 bytes)
+    // RLGL.State.defaultTextureId = rlLoadTexture(pixels, 1, 1, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+    // RLGL.State.currentTextureId = RLGL.State.defaultTextureId;
 
-    if (RLGL.State.defaultTextureId != 0) TRACELOG(RL_LOG_INFO, "TEXTURE: [ID %i] Default texture loaded successfully", RLGL.State.defaultTextureId);
-    else TRACELOG(RL_LOG_WARNING, "TEXTURE: Failed to load default texture");
+    // if (RLGL.State.defaultTextureId != 0) TRACELOG(RL_LOG_INFO, "TEXTURE: [ID %i] Default texture loaded successfully", RLGL.State.defaultTextureId);
+    // else TRACELOG(RL_LOG_WARNING, "TEXTURE: Failed to load default texture");
 
-    // Init default Shader (customized for GL 3.3 and ES2)
-    // Loaded: RLGL.State.defaultShaderId + RLGL.State.defaultShaderLocs
-    rlLoadShaderDefault();
-    RLGL.State.currentShaderId = RLGL.State.defaultShaderId;
-    RLGL.State.currentShaderLocs = RLGL.State.defaultShaderLocs;
+    // // Init default Shader (customized for GL 3.3 and ES2)
+    // // Loaded: RLGL.State.defaultShaderId + RLGL.State.defaultShaderLocs
+    // rlLoadShaderDefault();
+    // RLGL.State.currentShaderId = RLGL.State.defaultShaderId;
+    // RLGL.State.currentShaderLocs = RLGL.State.defaultShaderLocs;
 
-    // Init default vertex arrays buffers
-    // Simulate that the default shader has the location RL_SHADER_LOC_VERTEX_NORMAL to bind the normal buffer for the default render batch
-    RLGL.State.currentShaderLocs[RL_SHADER_LOC_VERTEX_NORMAL] = RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL;
-    RLGL.defaultBatch = rlLoadRenderBatch(RL_DEFAULT_BATCH_BUFFERS, RL_DEFAULT_BATCH_BUFFER_ELEMENTS);
-    RLGL.State.currentShaderLocs[RL_SHADER_LOC_VERTEX_NORMAL] = -1;
-    RLGL.currentBatch = &RLGL.defaultBatch;
+    // // Init default vertex arrays buffers
+    // // Simulate that the default shader has the location RL_SHADER_LOC_VERTEX_NORMAL to bind the normal buffer for the default render batch
+    // RLGL.State.currentShaderLocs[RL_SHADER_LOC_VERTEX_NORMAL] = RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL;
+    // RLGL.defaultBatch = rlLoadRenderBatch(RL_DEFAULT_BATCH_BUFFERS, RL_DEFAULT_BATCH_BUFFER_ELEMENTS);
+    // RLGL.State.currentShaderLocs[RL_SHADER_LOC_VERTEX_NORMAL] = -1;
+    // RLGL.currentBatch = &RLGL.defaultBatch;
 
-    // Init stack matrices (emulating OpenGL 1.1)
-    for (int i = 0; i < RL_MAX_MATRIX_STACK_SIZE; i++) RLGL.State.stack[i] = rlMatrixIdentity();
+    // // Init stack matrices (emulating OpenGL 1.1)
+    // for (int i = 0; i < RL_MAX_MATRIX_STACK_SIZE; i++) RLGL.State.stack[i] = rlMatrixIdentity();
 
-    // Init internal matrices
-    RLGL.State.transform = rlMatrixIdentity();
-    RLGL.State.projection = rlMatrixIdentity();
-    RLGL.State.modelview = rlMatrixIdentity();
-    RLGL.State.currentMatrix = &RLGL.State.modelview;
+    // // Init internal matrices
+    // RLGL.State.transform = rlMatrixIdentity();
+    // RLGL.State.projection = rlMatrixIdentity();
+    // RLGL.State.modelview = rlMatrixIdentity();
+    // RLGL.State.currentMatrix = &RLGL.State.modelview;
 #endif  // GRAPHICS_API_OPENGL_33 || GRAPHICS_API_OPENGL_ES2
 
 #if defined(GRAPHICS_API_OPENGL_11_SOFTWARE)
@@ -2375,6 +2380,10 @@ void rlglInit(int width, int height)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);                   // Set clear color (black)
     glClearDepth(1.0f);                                     // Set clear depth value (default)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);     // Clear color and depth buffers (depth buffer required for 3D)
+
+    // Store screen size into global variables
+    RLGL.State.framebufferWidth = width;
+    RLGL.State.framebufferHeight = height;
 
     TRACELOG(RL_LOG_INFO, "RLGL: Default OpenGL state initialized successfully");
     //----------------------------------------------------------
