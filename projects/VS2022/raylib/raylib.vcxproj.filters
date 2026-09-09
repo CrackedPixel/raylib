@@ -22,9 +22,6 @@
     <ClCompile Include="..\..\..\src\rtextures.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\utils.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\platforms\rcore_android.c">
       <Filter>Source Files\Platform Files</Filter>
     </ClCompile>
@@ -47,6 +44,9 @@
       <Filter>Source Files\Platform Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\platforms\rcore_desktop_win32.c">
+      <Filter>Source Files\Platform Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\platforms\rcore_memory.c">
       <Filter>Source Files\Platform Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -102,7 +102,13 @@
     <ClInclude Include="..\..\..\src\external\stb_vorbis.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\utils.h">
+    <ClInclude Include="..\..\..\src\external\rlsw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\external\rltexgpu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\external\rprand.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

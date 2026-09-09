@@ -38,7 +38,7 @@ float GetCharacter(int n, vec2 p)
 // Main shader logic
 // -----------------------------------------------------------------------------
 
-void main() 
+void main()
 {
     vec2 charPixelSize = vec2(fontSize, fontSize);
     vec2 uvCellSize = charPixelSize/resolution;
@@ -52,12 +52,12 @@ void main()
     float gray = GreyScale(cellColor);
 
 	int n =  4096;
-    
+
     // Character set from https://www.shadertoy.com/view/lssGDj
     // Create new bitmaps https://thrill-project.com/archiv/coding/bitmap/
     if (gray > 0.2) n = 65600;    // :
 	if (gray > 0.3) n = 18725316; // v
-	if (gray > 0.4) n = 15255086; // o 
+	if (gray > 0.4) n = 15255086; // o
 	if (gray > 0.5) n = 13121101; // &
 	if (gray > 0.6) n = 15252014; // 8
 	if (gray > 0.7) n = 13195790; // @

@@ -4,7 +4,7 @@
 *
 *   Example complexity rating: [★★☆☆] 2/4
 *
-*   Example originally created with raylib 5.5, last time updated with raylib 5.6
+*   Example originally created with raylib 5.5, last time updated with raylib 6.0
 *
 *   Example contributed by Maicon Santana (@maiconpintoabreu) and reviewed by Ramon Santamaria (@raysan5)
 *
@@ -87,15 +87,15 @@ int main(void)
             DrawTexture(fudesumi, 500, -30, WHITE);
             DrawTextureV(raysan, circlePos, WHITE);
         EndTextureMode();
-        
+
         BeginDrawing();
             ClearBackground(RAYWHITE);
 
             BeginShaderMode(shader);
                 // Draw the scene texture (that we rendered earlier) to the screen
                 // The shader will process every pixel of this texture
-                DrawTextureRec(target.texture, 
-                    (Rectangle){ 0, 0, (float)target.texture.width, (float)-target.texture.height }, 
+                DrawTextureRec(target.texture,
+                    (Rectangle){ 0, 0, (float)target.texture.width, (float)-target.texture.height },
                     (Vector2){ 0, 0 }, WHITE);
             EndShaderMode();
 

@@ -13,9 +13,6 @@
 *       - Improvement 01
 *       - Improvement 02
 *
-*   ADDITIONAL NOTES:
-*       - TRACELOG() function is located in raylib [utils] module
-*
 *   CONFIGURATION:
 *       #define RCORE_PLATFORM_CUSTOM_FLAG
 *           Custom flag for rcore on target platform -not used-
@@ -26,7 +23,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2013-2025 Ramon Santamaria (@raysan5) and contributors
+*   Copyright (c) 2013-2026 Ramon Santamaria (@raysan5) and contributors
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -72,7 +69,9 @@
 #include <shellscalingapi.h>
 #include <versionhelpers.h>
 
-#if !defined(GRAPHICS_API_OPENGL_11_SOFTWARE)
+#include <malloc.h>          // Required for alloca()
+
+#if !defined(GRAPHICS_API_OPENGL_SOFTWARE)
     #include <GL/gl.h>
 #endif
 
@@ -142,7 +141,7 @@ static PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = NULL;
 #define STYLE_MASK_READONLY     (WS_MINIMIZE | WS_MAXIMIZE)
 #define STYLE_MASK_WRITABLE     (~STYLE_MASK_READONLY)
 
-#define STYLE_FLAGS_RESIZABLE   WS_THICKFRAME
+#define STYLE_FLAGS_RESIZABLE   (WS_THICKFRAME | WS_MAXIMIZEBOX)
 
 #define STYLE_FLAGS_UNDECORATED_OFF     (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX)
 #define STYLE_FLAGS_UNDECORATED_ON      WS_POPUP
@@ -156,8 +155,6 @@ static PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = NULL;
 
 // Flags that have no operations to perform during an update
 #define FLAG_MASK_NO_UPDATE     (FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT)
-
-#define WM_APP_UPDATE_WINDOW_SIZE (WM_APP + 1)
 
 #define WGL_DRAW_TO_WINDOW_ARB              0x2001
 #define WGL_ACCELERATION_ARB                0x2003
@@ -195,8 +192,8 @@ static PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = NULL;
 #define WGL_CONTEXT_PROFILE_MASK_ARB        0x9126
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB    0x00000001
 #define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
-#define WGL_CONTEXT_ES_PROFILE_BIT_EXT		0x00000004
-#define WGL_CONTEXT_ES2_PROFILE_BIT_EXT		0x00000004
+#define WGL_CONTEXT_ES_PROFILE_BIT_EXT        0x00000004
+#define WGL_CONTEXT_ES2_PROFILE_BIT_EXT        0x00000004
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -260,9 +257,9 @@ static bool DecoratedFromStyle(DWORD style)
 // Get window style from required flags
 static DWORD MakeWindowStyle(unsigned flags)
 {
-    // We don't need this since we don't have any child windows, but I guess
-    // it improves efficiency, plus, windows adds this flag automatically anyway
-    // so it keeps our flags in sync with the OS
+    // Flag is not needed because there are no child windows,
+    // but supposedly it improves efficiency, plus, windows adds this
+    // flag automatically anyway so it keeps flags in sync with the OS
     DWORD style = WS_CLIPSIBLINGS;
 
     style |= (flags & FLAG_WINDOW_HIDDEN)? 0 : WS_VISIBLE;
@@ -271,8 +268,8 @@ static DWORD MakeWindowStyle(unsigned flags)
 
     // Minimized takes precedence over maximized
     int mized = MIZED_NONE;
-    if (FLAG_CHECK(flags, FLAG_WINDOW_MINIMIZED)) mized = MIZED_MIN;
-    if (flags & FLAG_WINDOW_MAXIMIZED) mized = MIZED_MAX;
+    if (flags & FLAG_WINDOW_MINIMIZED) mized = MIZED_MIN;
+    else if (flags & FLAG_WINDOW_MAXIMIZED) mized = MIZED_MAX;
 
     switch (mized)
     {
@@ -427,14 +424,12 @@ static bool UpdateWindowSize(int mode, HWND hwnd, int width, int height, unsigne
     else swpFlags |= SWP_NOMOVE;
 
     // WARNING: This code must be called after swInit() has been called, after InitPlatform() in [rcore]
-    //RECT rc = {0, 0, desired.cx, desired.cy};
-    //AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, FALSE, 0);
-    //SetWindowPos(hwnd, NULL, windowPos.x, windowPos.y, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(hwnd, NULL, windowPos.x, windowPos.y, windowSize.cx, windowSize.cy, SWP_NOMOVE | SWP_NOZORDER);
 
     return true;
 }
 
-// Verify if we are running in Windows 10 version 1703 (Creators Update)
+// Check if running in Windows 10 version 1703 (Creators Update)
 static BOOL IsWindows10Version1703OrGreaterWin32(void)
 {
     HMODULE ntdll = LoadLibraryW(L"ntdll.dll");
@@ -571,100 +566,100 @@ static KeyboardKey GetKeyFromWparam(WPARAM wparam)
         case 'X': return KEY_X;
         case 'Y': return KEY_Y;
         case 'Z': return KEY_Z;
-        /* case VK_LWIN: return KEY_; */
-        /* case VK_RWIN: return KEY_; */
-        /* case VK_APPS: return KEY_; */
-        /* case VK_SLEEP: return KEY_; */
-        /* case VK_NUMPAD0: return KEY_; */
-        /* case VK_NUMPAD1: return KEY_; */
-        /* case VK_NUMPAD2: return KEY_; */
-        /* case VK_NUMPAD3: return KEY_; */
-        /* case VK_NUMPAD4: return KEY_; */
-        /* case VK_NUMPAD5: return KEY_; */
-        /* case VK_NUMPAD6: return KEY_; */
-        /* case VK_NUMPAD7: return KEY_; */
-        /* case VK_NUMPAD8: return KEY_; */
-        /* case VK_NUMPAD9: return KEY_; */
-        /* case VK_MULTIPLY: return KEY_; */
-        /* case VK_ADD: return KEY_; */
-        /* case VK_SEPARATOR: return KEY_; */
-        /* case VK_SUBTRACT: return KEY_; */
-        /* case VK_DECIMAL: return KEY_; */
-        /* case VK_DIVIDE: return KEY_; */
-        /* case VK_F1: return KEY_; */
-        /* case VK_F2: return KEY_; */
-        /* case VK_F3: return KEY_; */
-        /* case VK_F4: return KEY_; */
-        /* case VK_F5: return KEY_; */
-        /* case VK_F6: return KEY_; */
-        /* case VK_F7: return KEY_; */
-        /* case VK_F8: return KEY_; */
-        /* case VK_F9: return KEY_; */
-        /* case VK_F10: return KEY_; */
-        /* case VK_F11: return KEY_; */
-        /* case VK_F12: return KEY_; */
-        /* case VK_F13: return KEY_; */
-        /* case VK_F14: return KEY_; */
-        /* case VK_F15: return KEY_; */
-        /* case VK_F16: return KEY_; */
-        /* case VK_F17: return KEY_; */
-        /* case VK_F18: return KEY_; */
-        /* case VK_F19: return KEY_; */
-        /* case VK_F20: return KEY_; */
-        /* case VK_F21: return KEY_; */
-        /* case VK_F22: return KEY_; */
-        /* case VK_F23: return KEY_; */
-        /* case VK_F24: return KEY_; */
-        /* case VK_NUMLOCK: return KEY_; */
-        /* case VK_SCROLL: return KEY_; */
-        /* case VK_LSHIFT: return KEY_; */
-        /* case VK_RSHIFT: return KEY_; */
-        /* case VK_LCONTROL: return KEY_; */
-        /* case VK_RCONTROL: return KEY_; */
-        /* case VK_LMENU: return KEY_; */
-        /* case VK_RMENU: return KEY_; */
-        /* case VK_BROWSER_BACK: return KEY_; */
-        /* case VK_BROWSER_FORWARD: return KEY_; */
-        /* case VK_BROWSER_REFRESH: return KEY_; */
-        /* case VK_BROWSER_STOP: return KEY_; */
-        /* case VK_BROWSER_SEARCH: return KEY_; */
-        /* case VK_BROWSER_FAVORITES: return KEY_; */
-        /* case VK_BROWSER_HOME: return KEY_; */
-        /* case VK_VOLUME_MUTE: return KEY_; */
-        /* case VK_VOLUME_DOWN: return KEY_; */
-        /* case VK_VOLUME_UP: return KEY_; */
-        /* case VK_MEDIA_NEXT_TRACK: return KEY_; */
-        /* case VK_MEDIA_PREV_TRACK: return KEY_; */
-        /* case VK_MEDIA_STOP: return KEY_; */
-        /* case VK_MEDIA_PLAY_PAUSE: return KEY_; */
-        /* case VK_LAUNCH_MAIL: return KEY_; */
-        /* case VK_LAUNCH_MEDIA_SELECT: return KEY_; */
-        /* case VK_LAUNCH_APP1: return KEY_; */
-        /* case VK_LAUNCH_APP2: return KEY_; */
-        /* case VK_OEM_1: return KEY_; */
-        /* case VK_OEM_PLUS: return KEY_; */
-        /* case VK_OEM_COMMA: return KEY_; */
-        /* case VK_OEM_MINUS: return KEY_; */
-        /* case VK_OEM_PERIOD: return KEY_; */
-        /* case VK_OEM_2: return KEY_; */
-        /* case VK_OEM_3: return KEY_; */
-        /* case VK_OEM_4: return KEY_; */
-        /* case VK_OEM_5: return KEY_; */
-        /* case VK_OEM_6: return KEY_; */
-        /* case VK_OEM_7: return KEY_; */
-        /* case VK_OEM_8: return KEY_; */
-        /* case VK_OEM_102: return KEY_; */
-        /* case VK_PROCESSKEY: return KEY_; */
-        /* case VK_PACKET: return KEY_; */
-        /* case VK_ATTN: return KEY_; */
-        /* case VK_CRSEL: return KEY_; */
-        /* case VK_EXSEL: return KEY_; */
-        /* case VK_EREOF: return KEY_; */
-        /* case VK_PLAY: return KEY_; */
-        /* case VK_ZOOM: return KEY_; */
-        /* case VK_NONAME: return KEY_; */
-        /* case VK_PA1: return KEY_; */
-        /* case VK_OEM_CLEAR: return KEY_; */
+        //case VK_LWIN: return KEY_;
+        //case VK_RWIN: return KEY_;
+        //case VK_APPS: return KEY_;
+        //case VK_SLEEP: return KEY_;
+        //case VK_NUMPAD0: return KEY_;
+        //case VK_NUMPAD1: return KEY_;
+        //case VK_NUMPAD2: return KEY_;
+        //case VK_NUMPAD3: return KEY_;
+        //case VK_NUMPAD4: return KEY_;
+        //case VK_NUMPAD5: return KEY_;
+        //case VK_NUMPAD6: return KEY_;
+        //case VK_NUMPAD7: return KEY_;
+        //case VK_NUMPAD8: return KEY_;
+        //case VK_NUMPAD9: return KEY_;
+        //case VK_MULTIPLY: return KEY_;
+        //case VK_ADD: return KEY_;
+        //case VK_SEPARATOR: return KEY_;
+        //case VK_SUBTRACT: return KEY_;
+        //case VK_DECIMAL: return KEY_;
+        //case VK_DIVIDE: return KEY_;
+        //case VK_F1: return KEY_;
+        //case VK_F2: return KEY_;
+        //case VK_F3: return KEY_;
+        //case VK_F4: return KEY_;
+        //case VK_F5: return KEY_;
+        //case VK_F6: return KEY_;
+        //case VK_F7: return KEY_;
+        //case VK_F8: return KEY_;
+        //case VK_F9: return KEY_;
+        //case VK_F10: return KEY_;
+        //case VK_F11: return KEY_;
+        //case VK_F12: return KEY_;
+        //case VK_F13: return KEY_;
+        //case VK_F14: return KEY_;
+        //case VK_F15: return KEY_;
+        //case VK_F16: return KEY_;
+        //case VK_F17: return KEY_;
+        //case VK_F18: return KEY_;
+        //case VK_F19: return KEY_;
+        //case VK_F20: return KEY_;
+        //case VK_F21: return KEY_;
+        //case VK_F22: return KEY_;
+        //case VK_F23: return KEY_;
+        //case VK_F24: return KEY_;
+        //case VK_NUMLOCK: return KEY_;
+        //case VK_SCROLL: return KEY_;
+        //case VK_LSHIFT: return KEY_;
+        //case VK_RSHIFT: return KEY_;
+        //case VK_LCONTROL: return KEY_;
+        //case VK_RCONTROL: return KEY_;
+        //case VK_LMENU: return KEY_;
+        //case VK_RMENU: return KEY_;
+        //case VK_BROWSER_BACK: return KEY_;
+        //case VK_BROWSER_FORWARD: return KEY_;
+        //case VK_BROWSER_REFRESH: return KEY_;
+        //case VK_BROWSER_STOP: return KEY_;
+        //case VK_BROWSER_SEARCH: return KEY_;
+        //case VK_BROWSER_FAVORITES: return KEY_;
+        //case VK_BROWSER_HOME: return KEY_;
+        //case VK_VOLUME_MUTE: return KEY_;
+        //case VK_VOLUME_DOWN: return KEY_;
+        //case VK_VOLUME_UP: return KEY_;
+        //case VK_MEDIA_NEXT_TRACK: return KEY_;
+        //case VK_MEDIA_PREV_TRACK: return KEY_;
+        //case VK_MEDIA_STOP: return KEY_;
+        //case VK_MEDIA_PLAY_PAUSE: return KEY_;
+        //case VK_LAUNCH_MAIL: return KEY_;
+        //case VK_LAUNCH_MEDIA_SELECT: return KEY_;
+        //case VK_LAUNCH_APP1: return KEY_;
+        //case VK_LAUNCH_APP2: return KEY_;
+        //case VK_OEM_1: return KEY_;
+        //case VK_OEM_PLUS: return KEY_;
+        //case VK_OEM_COMMA: return KEY_;
+        //case VK_OEM_MINUS: return KEY_;
+        //case VK_OEM_PERIOD: return KEY_;
+        //case VK_OEM_2: return KEY_;
+        //case VK_OEM_3: return KEY_;
+        //case VK_OEM_4: return KEY_;
+        //case VK_OEM_5: return KEY_;
+        //case VK_OEM_6: return KEY_;
+        //case VK_OEM_7: return KEY_;
+        //case VK_OEM_8: return KEY_;
+        //case VK_OEM_102: return KEY_;
+        //case VK_PROCESSKEY: return KEY_;
+        //case VK_PACKET: return KEY_;
+        //case VK_ATTN: return KEY_;
+        //case VK_CRSEL: return KEY_;
+        //case VK_EXSEL: return KEY_;
+        //case VK_EREOF: return KEY_;
+        //case VK_PLAY: return KEY_;
+        //case VK_ZOOM: return KEY_;
+        //case VK_NONAME: return KEY_;
+        //case VK_PA1: return KEY_;
+        //case VK_OEM_CLEAR: return KEY_;
         default: return KEY_NULL;
     }
 }
@@ -937,7 +932,7 @@ void SetWindowIcon(Image image)
 // Set icon for window
 void SetWindowIcons(Image *images, int count)
 {
-    // TODO.
+    // TODO: Implement SetWindowIcons()
 }
 
 void SetWindowTitle(const char *title)
@@ -977,25 +972,40 @@ void SetWindowMonitor(int monitor)
 // Set window minimum dimensions (FLAG_WINDOW_RESIZABLE)
 void SetWindowMinSize(int width, int height)
 {
-    TRACELOG(LOG_WARNING, "SetWindowMinSize not implemented");
+    if ((width > CORE.Window.screenMax.width) || (height > CORE.Window.screenMax.height))
+    {
+        TRACELOG(LOG_WARNING, "WIN32: WINDOW: Cannot set minimum screen size higher than the maximum");
+        return;
+    }
 
     CORE.Window.screenMin.width = width;
     CORE.Window.screenMin.height = height;
+
+    SetWindowSize(platform.appScreenWidth, platform.appScreenHeight);
 }
 
 // Set window maximum dimensions (FLAG_WINDOW_RESIZABLE)
 void SetWindowMaxSize(int width, int height)
 {
-    TRACELOG(LOG_WARNING, "SetWindowMaxSize not implemented");
+    if ((width < CORE.Window.screenMin.width) || (height < CORE.Window.screenMin.height))
+    {
+        TRACELOG(LOG_WARNING, "WIN32: WINDOW: Cannot set maximum screen size lower than the minimum");
+        return;
+    }
 
     CORE.Window.screenMax.width = width;
     CORE.Window.screenMax.height = height;
+
+    SetWindowSize(platform.appScreenWidth, platform.appScreenHeight);
 }
 
 // Set window dimensions
 void SetWindowSize(int width, int height)
 {
-    TRACELOG(LOG_WARNING, "SetWindowSize not implemented");
+    int screenWidth = fmaxf(CORE.Window.screenMin.width, fminf(CORE.Window.screenMax.width, width));
+    int screenHeight = fmaxf(CORE.Window.screenMin.height, fminf(CORE.Window.screenMax.height, height));
+
+    UpdateWindowSize(1, platform.hwnd, screenWidth, screenHeight, platform.desiredFlags);
 }
 
 // Set window opacity, value opacity is between 0.0 and 1.0
@@ -1013,7 +1023,7 @@ void SetWindowFocused(void)
 // Get native window handle
 void *GetWindowHandle(void)
 {
-    return platform.hwnd;
+    return (void *)platform.hwnd;
 }
 
 int GetMonitorCount(void)
@@ -1053,14 +1063,14 @@ Vector2 GetMonitorPosition(int monitor)
 // Get selected monitor width (currently used by monitor)
 int GetMonitorWidth(int monitor)
 {
-    TRACELOG(LOG_WARNING, "GetMonitorWidth not implemented");
+    //TRACELOG(LOG_WARNING, "GetMonitorWidth not implemented");
     return 0;
 }
 
 // Get selected monitor height (currently used by monitor)
 int GetMonitorHeight(int monitor)
 {
-    TRACELOG(LOG_WARNING, "GetMonitorHeight not implemented");
+    //TRACELOG(LOG_WARNING, "GetMonitorHeight not implemented");
     return 0;
 }
 
@@ -1095,7 +1105,7 @@ const char *GetMonitorName(int monitor)
 // Get window position XY on monitor
 Vector2 GetWindowPosition(void)
 {
-    TRACELOG(LOG_WARNING, "GetWindowPosition not implemented");
+    //TRACELOG(LOG_WARNING, "GetWindowPosition not implemented");
     return (Vector2){ 0, 0 };
 }
 
@@ -1119,12 +1129,37 @@ const char *GetClipboardText(void)
     return NULL;
 }
 
+#if SUPPORT_CLIPBOARD_IMAGE && SUPPORT_MODULE_RTEXTURES
+    #define WIN32_CLIPBOARD_IMPLEMENTATION
+    #define WINUSER_ALREADY_INCLUDED
+    #define WINBASE_ALREADY_INCLUDED
+    #define WINGDI_ALREADY_INCLUDED
+    #include "../external/win32_clipboard.h"
+#endif
+
 // Get clipboard image
 Image GetClipboardImage(void)
 {
     Image image = { 0 };
 
-    TRACELOG(LOG_WARNING, "GetClipboardText not implemented");
+#if SUPPORT_CLIPBOARD_IMAGE && SUPPORT_MODULE_RTEXTURES
+    unsigned int dataSize = 0;
+    void *fileData = NULL;
+    int width = 0;
+    int height = 0;
+
+    fileData = (void *)Win32GetClipboardImageData(&width, &height, &dataSize);
+
+    if (fileData == NULL) TRACELOG(LOG_WARNING, "Clipboard image: Couldn't get clipboard data.");
+    else
+    {
+        image = LoadImageFromMemory(".bmp", (const unsigned char*)fileData, (int)dataSize);
+
+        RL_FREE(fileData);
+    }
+#else
+    TRACELOG(LOG_WARNING, "Clipboard image: SUPPORT_CLIPBOARD_IMAGE requires SUPPORT_MODULE_RTEXTURES to work properly");
+#endif // SUPPORT_CLIPBOARD_IMAGE
 
     return image;
 }
@@ -1136,16 +1171,16 @@ void ShowCursor(void)
     CORE.Input.Mouse.cursorHidden = false;
 }
 
-// Hides mouse cursor
+// Hide mouse cursor
 void HideCursor(void)
 {
-    // NOTE: We use SetCursor() instead of ShowCursor() because
+    // NOTE: Using SetCursor() instead of ShowCursor() because
     // it makes it easy to only hide the cursor while it's inside the client area
     SetCursor(NULL);
     CORE.Input.Mouse.cursorHidden = true;
 }
 
-// Enables cursor (unlock cursor)
+// Enable cursor (unlock cursor)
 void EnableCursor(void)
 {
     if (CORE.Input.Mouse.cursorLocked)
@@ -1208,7 +1243,7 @@ void SwapScreenBuffer(void)
 {
     if (!platform.hdc) abort();
 
-#if defined(GRAPHICS_API_OPENGL_11_SOFTWARE)
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
     // Update framebuffer
     rlCopyFramebuffer(0, 0, CORE.Window.render.width, CORE.Window.render.height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, platform.pixels);
 
@@ -1228,23 +1263,40 @@ void SwapScreenBuffer(void)
 // Get elapsed time measure in seconds
 double GetTime(void)
 {
-    LARGE_INTEGER now;
+    double time = 0.0;
+    LARGE_INTEGER now = { 0 };
     QueryPerformanceCounter(&now);
-    return (double)(now.QuadPart - CORE.Time.base)/(double)platform.timerFrequency.QuadPart;
+    time = (double)(now.QuadPart - CORE.Time.base)/(double)platform.timerFrequency.QuadPart;
+
+    return time;
 }
 
 // Open URL with default system browser (if available)
-// NOTE: This function is only safe to use if you control the URL given
-// A user could craft a malicious string performing another action
-// Only call this function yourself not with user input or make sure to check the string yourself
-// Ref: https://github.com/raysan5/raylib/issues/686
+// WARNING: This function is only safe to use if you control the URL given,
+// a user could craft a malicious string to perform and undesired action
+// NOTE: Some safety checks have been added to mitigate security issues
 void OpenURL(const char *url)
 {
-    // Security check to (partially) avoid malicious code on target platform
-    if (strchr(url, '\'') != NULL) TRACELOG(LOG_WARNING, "SYSTEM: Provided URL could be potentially malicious, avoid [\'] character");
+    // Security check to (partially) avoid malicious code
+    if ((strchr(url, '\'') != NULL) || (strchr(url, '\"') != NULL))
+    {
+        // Filter characters: ' and "
+        TRACELOG(LOG_WARNING, "SYSTEM: Provided URL could be potentially malicious, avoid [\'\"] characters");
+    }
+    else if ((strncmp(url, "http://", 7) != 0) && (strncmp(url, "https://", 8) != 0))
+    {
+        // Only allow URL starting with "http://" or "https://" protocols
+        TRACELOG(LOG_WARNING, "SYSTEM: Provided URL must start with 'http://' or 'https://' protocols");
+    }
     else
     {
-        TRACELOG(LOG_WARNING, "OpenURL not implemented");
+        int len = strlen(url) + 16;
+        char *cmd = (char *)RL_CALLOC(len, sizeof(char));
+        snprintf(cmd, len, "explorer \"%s\"", url);
+
+        int result = system(cmd);
+        if (result == -1) TRACELOG(LOG_WARNING, "OpenURL() child process could not be created");
+        RL_FREE(cmd);
     }
 }
 
@@ -1272,8 +1324,8 @@ void SetMousePosition(int x, int y)
     if (!CORE.Input.Mouse.cursorLocked)
     {
         CORE.Input.Mouse.currentPosition = (Vector2){ (float)x, (float)y };
-        CORE.Input.Mouse.previousPosition = CORE.Input.Mouse.currentPosition;
-        TRACELOG(LOG_WARNING, "SetMousePosition not implemented");
+
+        TRACELOG(LOG_WARNING, "SetMousePosition not implemented at platform level");
     }
     else TRACELOG(LOG_WARNING, "INPUT: MOUSE: Cursor not enabled");
 }
@@ -1342,7 +1394,7 @@ void PollInputEvents(void)
 //----------------------------------------------------------------------------------
 
 // Initialize modern OpenGL context
-// NOTE: We need to create a dummy context first to query required extensions
+// NOTE: Creating a dummy context first to query required extensions
 HGLRC InitOpenGL(HWND hwnd, HDC hdc)
 {
     // First, create a dummy context to get WGL extensions
@@ -1457,7 +1509,7 @@ HGLRC InitOpenGL(HWND hwnd, HDC hdc)
             0 // Terminator
         };
 
-        // NOTE: We are not sharing context resources so, second parameters is NULL
+        // NOTE: Not sharing context resources so, second parameters is NULL
         realContext = wglCreateContextAttribsARB(hdc, NULL, contextAttribs);
 
         // Check for error context creation errors
@@ -1473,8 +1525,8 @@ HGLRC InitOpenGL(HWND hwnd, HDC hdc)
     // Activate real context
     if (realContext) wglMakeCurrent(hdc, realContext);
 
-    // Once we got a real modern OpenGL context,
-    // we can load required extensions (function pointers)
+    // Once a real modern OpenGL context is created,
+    // required extensions can be loaded (function pointers)
     rlLoadExtensions(WglGetProcAddress);
 
     return realContext;
@@ -1491,7 +1543,8 @@ int InitPlatform(void)
 
     // NOTE: From this point CORE.Window.flags should always reflect the actual state of the window
     CORE.Window.flags = FLAG_WINDOW_HIDDEN | (platform.desiredFlags & FLAG_MASK_NO_UPDATE);
-
+    CORE.Window.screenMax.width = 9999;
+    CORE.Window.screenMax.height = 9999;
 /*
     // TODO: Review SetProcessDpiAwarenessContext()
     // NOTE: SetProcessDpiAwarenessContext() requires Windows 10, version 1703 and shcore.lib linkage
@@ -1508,7 +1561,6 @@ int InitPlatform(void)
         if (hr < 0) TRACELOG(LOG_ERROR, "%s failed, hresult=0x%lx", "SetProcessDpiAwareness", (DWORD)hr);
     }
 */
-
     HINSTANCE hInstance = GetModuleHandleW(0);
 
     // Define window class
@@ -1518,7 +1570,7 @@ int InitPlatform(void)
         .lpfnWndProc = WndProc,                         // Custom procedure assigned
         .cbWndExtra = sizeof(LONG_PTR),                 // extra space for the Tuple object ptr
         .hInstance = hInstance,
-        .hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW), // TODO: Audit if we want to set this since we're implementing WM_SETCURSOR
+        .hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW), // TODO: Check if this is really required, since WM_SETCURSOR event is processed
         .lpszClassName = CLASS_NAME                     // Class name: L"raylibWindow"
     };
 
@@ -1585,10 +1637,8 @@ int InitPlatform(void)
     // NOTE: Windows GDI object that represents a drawing surface
     platform.hdc = GetDC(platform.hwnd);
 
-    if (rlGetVersion() == RL_OPENGL_11_SOFTWARE) // Using software renderer
+    if (rlGetVersion() == RL_OPENGL_SOFTWARE) // Using software renderer
     {
-        //ShowWindow(platform.hwnd, SW_SHOWDEFAULT); //SW_SHOWNORMAL
-
         // Initialize software framebuffer
         BITMAPINFO bmi = { 0 };
         ZeroMemory(&bmi, sizeof(bmi));
@@ -1617,6 +1667,9 @@ int InitPlatform(void)
 
     CORE.Window.ready = true;
 
+    // Activate window to set focus and show taskbar icon
+    ShowWindow(platform.hwnd, SW_SHOWDEFAULT);
+
     // Update flags (in case of deferred state change required)
     UpdateFlags(platform.hwnd, platform.desiredFlags, platform.appScreenWidth, platform.appScreenHeight);
 
@@ -1624,22 +1677,23 @@ int InitPlatform(void)
     CORE.Window.render.height = CORE.Window.screen.height;
     CORE.Window.currentFbo.width = CORE.Window.render.width;
     CORE.Window.currentFbo.height = CORE.Window.render.height;
-    TRACELOG(LOG_INFO, "DISPLAY: Device initialized successfully");
+    TRACELOG(LOG_INFO, "DISPLAY: Device initialized successfully %s",
+        FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_HIGHDPI)? "(HighDPI)" : "");
     TRACELOG(LOG_INFO, "    > Display size: %i x %i", CORE.Window.display.width, CORE.Window.display.height);
     TRACELOG(LOG_INFO, "    > Screen size:  %i x %i", CORE.Window.screen.width, CORE.Window.screen.height);
     TRACELOG(LOG_INFO, "    > Render size:  %i x %i", CORE.Window.render.width, CORE.Window.render.height);
     TRACELOG(LOG_INFO, "    > Viewport offsets: %i, %i", CORE.Window.renderOffset.x, CORE.Window.renderOffset.y);
 
-    if (rlGetVersion() == RL_OPENGL_11_SOFTWARE) // Using software renderer
+    if (rlGetVersion() == RL_OPENGL_SOFTWARE) // Using software renderer
     {
         TRACELOG(LOG_INFO, "GL: OpenGL device information:");
-        TRACELOG(LOG_INFO, "    > Vendor:   %s", "raylib");
-        TRACELOG(LOG_INFO, "    > Renderer: %s", "rlsw - OpenGL 1.1 Software Renderer");
-        TRACELOG(LOG_INFO, "    > Version:  %s", "1.0");
+        TRACELOG(LOG_INFO, "    > Vendor:   %s", glGetString(GL_VENDOR));
+        TRACELOG(LOG_INFO, "    > Renderer: %s", glGetString(GL_RENDERER));
+        TRACELOG(LOG_INFO, "    > Version:  %s", glGetString(GL_VERSION));
         TRACELOG(LOG_INFO, "    > GLSL:     %s", "NOT SUPPORTED");
     }
 
-    // Initialize timming system
+    // Initialize timing system
     //----------------------------------------------------------------------------
     LARGE_INTEGER time = { 0 };
     QueryPerformanceCounter(&time);
@@ -1700,7 +1754,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
         case WM_DESTROY:
         {
             // Clean up for window destruction
-            if (rlGetVersion() == RL_OPENGL_11_SOFTWARE) // Using software renderer
+            if (rlGetVersion() == RL_OPENGL_SOFTWARE) // Using software renderer
             {
                 if (platform.hdcmem)
                 {
@@ -1741,15 +1795,46 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
             memset(CORE.Input.Keyboard.previousKeyState, 0, sizeof(CORE.Input.Keyboard.previousKeyState));
             memset(CORE.Input.Keyboard.currentKeyState, 0, sizeof(CORE.Input.Keyboard.currentKeyState));
         } break;
-        case WM_SIZING:
+        case WM_SIZING: // Sent to a window that the user is resizing
         {
             if (CORE.Window.flags & FLAG_WINDOW_RESIZABLE)
             {
-                // TODO: Enforce min/max size
+                //HandleWindowResize(hwnd, &platform.appScreenWidth, &platform.appScreenHeight);
             }
-            else TRACELOG(LOG_WARNING, "WIN32: WINDOW: Trying to resize a non-resizable window");
 
             result = TRUE;
+        } break;
+        case WM_SIZE:
+        {
+            // WARNING: Don't trust the docs, they say this message can not be obtained if not calling DefWindowProc()
+            // in response to WM_WINDOWPOSCHANGED but looks like when a window is created,
+            // this message can be obtained without getting WM_WINDOWPOSCHANGED
+
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+            // WARNING: Waiting two frames before resizing because software-renderer backend is initilized with swInit() later
+            // than InitPlatform(), that triggers WM_SIZE, so avoid crashing
+            if (CORE.Time.frameCounter > 2) HandleWindowResize(hwnd, &platform.appScreenWidth, &platform.appScreenHeight);
+#else
+            // NOTE: This message is only triggered on window creation
+            HandleWindowResize(hwnd, &platform.appScreenWidth, &platform.appScreenHeight);
+#endif
+            result = 0; // If an application processes WM_SIZE message, it should return zero
+        } break;
+        case WM_GETMINMAXINFO:
+        {
+            DWORD style = MakeWindowStyle(platform.desiredFlags);
+            SIZE maxClientSize = { CORE.Window.screenMax.width, CORE.Window.screenMax.height };
+            SIZE maxWindowSize = CalcWindowSize(96, maxClientSize, style);
+            SIZE minClientSize = { CORE.Window.screenMin.width, CORE.Window.screenMin.height };
+            SIZE minWindowSize = CalcWindowSize(96, minClientSize, style);
+
+            LPMINMAXINFO lpmmi = (LPMINMAXINFO) lparam;
+            lpmmi->ptMaxSize.x = maxWindowSize.cx;
+            lpmmi->ptMaxSize.y = maxWindowSize.cy;
+            lpmmi->ptMaxTrackSize.x = maxWindowSize.cx;
+            lpmmi->ptMaxTrackSize.y = maxWindowSize.cy;
+            lpmmi->ptMinTrackSize.x = minWindowSize.cx;
+            lpmmi->ptMinTrackSize.y = minWindowSize.cy;
         } break;
         case WM_STYLECHANGING:
         {
@@ -1774,7 +1859,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
                     {
                         // looks like windows will automatically "unminimize" a window
                         // if a style changes modifies it's size
-                        TRACELOG(LOG_INFO, "WIN32: WINDOW: Style change modifed window size, removing maximized flag");
+                        TRACELOG(LOG_INFO, "WIN32: WINDOW: Style change modified window size, removing maximized flag");
                         deferredFlags->clear |= FLAG_WINDOW_MAXIMIZED;
                     }
                 }
@@ -1833,26 +1918,21 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
                 default: break;
             }
         } break;
-        case WM_SIZE:
-        {
-            // WARNING: Don't trust the docs, they say you won't get this message if you don't call DefWindowProc
-            // in response to WM_WINDOWPOSCHANGED but looks like when a window is created you'll get this
-            // message without getting WM_WINDOWPOSCHANGED
-            HandleWindowResize(hwnd, &platform.appScreenWidth, &platform.appScreenHeight);
-        } break;
-        //case WM_MOVE
+        //case WM_MOVE: break;
         case WM_WINDOWPOSCHANGED:
         {
             WINDOWPOS *pos = (WINDOWPOS*)lparam;
             if (!(pos->flags & SWP_NOSIZE)) HandleWindowResize(hwnd, &platform.appScreenWidth, &platform.appScreenHeight);
+
+            DefWindowProc(hwnd, msg, wparam, lparam);
         } break;
         case WM_GETDPISCALEDSIZE:
         {
             SIZE *inoutSize = (SIZE *)lparam;
             UINT newDpi = (UINT)wparam; // TODO: WARNING: Converting from WPARAM = UINT_PTR
 
-            // for any of these other cases, we might want to post a window
-            // resize event after the dpi changes?
+            // For the following flag changes, a window resize event should be posted,
+            // TODO: Should it be done after dpi changes?
             if (CORE.Window.flags & FLAG_WINDOW_MINIMIZED) return TRUE;
             if (CORE.Window.flags & FLAG_WINDOW_MAXIMIZED) return TRUE;
             if (CORE.Window.flags & FLAG_BORDERLESS_WINDOWED_MODE) return TRUE;
@@ -1871,13 +1951,23 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
         } break;
         case WM_DPICHANGED:
         {
+            // Get current dpi scale factor
+            float scalex = HIWORD(wparam)/96.0f;
+            float scaley = LOWORD(wparam)/96.0f;
+
             RECT *suggestedRect = (RECT *)lparam;
 
             // Never set the window size to anything other than the suggested rect here
             // Doing so can cause a window to stutter between monitors when transitioning between them
-            int result = (int)SetWindowPos(hwnd, NULL, suggestedRect->left, suggestedRect->top,
-                suggestedRect->right - suggestedRect->left, suggestedRect->bottom - suggestedRect->top, SWP_NOZORDER | SWP_NOACTIVATE);
+            int result = (int)SetWindowPos(hwnd, NULL,
+                suggestedRect->left, suggestedRect->top,
+                suggestedRect->right - suggestedRect->left,
+                suggestedRect->bottom - suggestedRect->top,
+                SWP_NOZORDER | SWP_NOACTIVATE);
+
             if (result == 0) TRACELOG(LOG_ERROR, "Failed to set window position [ERROR: %lu]", GetLastError());
+
+            // TODO: Update screen data, render size, screen scaling, viewport...
 
         } break;
         case WM_SETCURSOR:
@@ -1893,7 +1983,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
         } break;
         case WM_PAINT:
         {
-            if (rlGetVersion() == RL_OPENGL_11_SOFTWARE) // Using software renderer
+            if (rlGetVersion() == RL_OPENGL_SOFTWARE) // Using software renderer
             {
                 PAINTSTRUCT ps = { 0 };
                 HDC hdc = BeginPaint(hwnd, &ps);
@@ -1903,6 +1993,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
 
                 EndPaint(hwnd, &ps);
             }
+            else DefWindowProc(hwnd, msg, wparam, lparam);
         }
         case WM_INPUT:
         {
@@ -1945,10 +2036,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
         } break;
         case WM_MOUSEWHEEL: CORE.Input.Mouse.currentWheelMove.y = ((float)GET_WHEEL_DELTA_WPARAM(wparam))/WHEEL_DELTA; break;
         case WM_MOUSEHWHEEL: CORE.Input.Mouse.currentWheelMove.x = ((float)GET_WHEEL_DELTA_WPARAM(wparam))/WHEEL_DELTA; break;
-        case WM_APP_UPDATE_WINDOW_SIZE:
-        {
-            //UpdateWindowSize(UPDATE_WINDOW_NORMAL, hwnd, platform.appScreenWidth, platform.appScreenHeight, CORE.Window.flags);
-        } break;
 
         default: result = DefWindowProcW(hwnd, msg, wparam, lparam); // Message passed directly for execution (default behaviour)
     }
@@ -1981,7 +2068,7 @@ static void HandleKey(WPARAM wparam, LPARAM lparam, char state)
     {
         CORE.Input.Keyboard.currentKeyState[key] = state;
 
-        if ((key == KEY_ESCAPE) && (state == 1)) CORE.Window.shouldClose = 1;
+        if ((key == CORE.Input.Keyboard.exitKey) && (state == 1)) CORE.Window.shouldClose = true;
     }
     else TRACELOG(LOG_WARNING, "INPUT: Unknown (or currently unhandled) virtual keycode %d (0x%x)", wparam, wparam);
 
@@ -2000,8 +2087,11 @@ static void HandleMouseButton(int button, char state)
 static void HandleRawInput(LPARAM lparam)
 {
     RAWINPUT input = { 0 };
+    UINT inputSize = 0;
 
-    UINT inputSize = sizeof(input);
+    if (GetRawInputData((HRAWINPUT)lparam, RID_INPUT, NULL, &inputSize, sizeof(RAWINPUTHEADER)) != 0) return;
+    if (inputSize > sizeof(input)) return;
+
     UINT size = GetRawInputData((HRAWINPUT)lparam, RID_INPUT, &input, &inputSize, sizeof(RAWINPUTHEADER));
 
     if (size == (UINT)-1) TRACELOG(LOG_ERROR, "WIN32: Failed to get raw input data [ERROR: %lu]", GetLastError());
@@ -2012,8 +2102,8 @@ static void HandleRawInput(LPARAM lparam)
 
     if (input.data.mouse.usFlags & MOUSE_VIRTUAL_DESKTOP) TRACELOG(LOG_ERROR, "TODO: handle virtual desktop mouse inputs!");
 
-    // Trick to keep the mouse position at 0,0 and instead move
-    // the previous position so we can still get a proper mouse delta
+    // Trick to keep the mouse position at (0,0) and instead move
+    // the previous position so a proper mouse delta can still be retrieved
     //CORE.Input.Mouse.previousPosition.x -= input.data.mouse.lLastX;
     //CORE.Input.Mouse.previousPosition.y -= input.data.mouse.lLastY;
     //if (CORE.Input.Mouse.currentPosition.x != 0) abort();
@@ -2030,13 +2120,10 @@ static void HandleWindowResize(HWND hwnd, int *width, int *height)
     GetClientRect(hwnd, &rect);
     SIZE clientSize = { rect.right, rect.bottom };
 
-    // TODO: Update framebuffer on resize
     CORE.Window.currentFbo.width = (int)clientSize.cx;
     CORE.Window.currentFbo.height = (int)clientSize.cy;
-    //glViewport(0, 0, clientSize.cx, clientSize.cy);
-    //SetupFramebuffer(0, 0);
-
     SetupViewport(clientSize.cx, clientSize.cy);
+
     CORE.Window.resizedLastFrame = true;
     float dpiScale = ((float)GetDpiForWindow(hwnd))/96.0f;
     bool highdpi = !!(CORE.Window.flags & FLAG_WINDOW_HIGHDPI);
@@ -2054,6 +2141,10 @@ static void HandleWindowResize(HWND hwnd, int *width, int *height)
 
     CORE.Window.screenScale = MatrixScale( (float)CORE.Window.render.width/CORE.Window.screen.width,
         (float)CORE.Window.render.height/CORE.Window.screen.height, 1.0f);
+
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    swResize(clientSize.cx, clientSize.cy);
+#endif
 }
 
 // Update window style
@@ -2078,10 +2169,10 @@ static void UpdateWindowStyle(HWND hwnd, unsigned desiredFlags)
     // Minimized takes precedence over maximized
     Mized currentMized = MIZED_NONE;
     Mized desiredMized = MIZED_NONE;
-    if (CORE.Window.flags & WS_MINIMIZE) currentMized = MIZED_MIN;
-    else if (CORE.Window.flags & WS_MAXIMIZE) currentMized = MIZED_MAX;
-    if (desiredFlags & WS_MINIMIZE) currentMized = MIZED_MIN;
-    else if (desiredFlags & WS_MAXIMIZE) currentMized = MIZED_MAX;
+    if (CORE.Window.flags & FLAG_WINDOW_MINIMIZED) currentMized = MIZED_MIN;
+    else if (CORE.Window.flags & FLAG_WINDOW_MAXIMIZED) currentMized = MIZED_MAX;
+    if (desiredFlags & FLAG_WINDOW_MINIMIZED) desiredMized = MIZED_MIN;
+    else if (desiredFlags & FLAG_WINDOW_MAXIMIZED) desiredMized = MIZED_MAX;
 
     if (currentMized != desiredMized)
     {
@@ -2097,10 +2188,41 @@ static void UpdateWindowStyle(HWND hwnd, unsigned desiredFlags)
 // Sanitize flags
 static unsigned SanitizeFlags(int mode, unsigned flags)
 {
-    if ((flags & FLAG_WINDOW_MAXIMIZED) && (flags & FLAG_BORDERLESS_WINDOWED_MODE))
+    if (flags & FLAG_WINDOW_MAXIMIZED)
     {
-        TRACELOG(LOG_WARNING, "WIN32: WINDOW: Borderless windows mode overriding maximized window flag");
-        flags &= ~FLAG_WINDOW_MAXIMIZED;
+        if (flags & FLAG_BORDERLESS_WINDOWED_MODE)
+        {
+            TRACELOG(LOG_WARNING, "WIN32: WINDOW: Borderless windows mode overriding maximized window flag");
+            flags &= ~FLAG_WINDOW_MAXIMIZED;
+        }
+
+        if (~flags & FLAG_WINDOW_RESIZABLE)
+        {
+            if (!(CORE.Window.flags & FLAG_WINDOW_MAXIMIZED))
+            {
+                TRACELOG(LOG_WARNING, "WIN32: WINDOW: Cannot maximize a non-resizable window");
+                flags &= ~FLAG_WINDOW_MAXIMIZED;
+            }
+            else if (CORE.Window.flags & FLAG_WINDOW_RESIZABLE)
+            {
+                TRACELOG(LOG_WARNING, "WIN32: WINDOW: Cannot set window as non-resizable when maximized");
+                flags |= FLAG_WINDOW_RESIZABLE;
+            }
+        }
+        else if (!(CORE.Window.flags & FLAG_WINDOW_MAXIMIZED))
+        {
+            if (CORE.Window.flags & FLAG_WINDOW_MINIMIZED)
+            {
+                // Window needs to be unminimized before it can be maximized since minimizing takes precedence
+                flags &= ~FLAG_WINDOW_MINIMIZED;
+            }
+            else if ((flags & FLAG_WINDOW_MINIMIZED) && !(CORE.Window.flags & FLAG_WINDOW_MINIMIZED))
+            {
+                TRACELOG(LOG_WARNING, "WIN32: WINDOW: Cannot minimize and maximize a window in the same frame");
+                flags &= ~FLAG_WINDOW_MINIMIZED;
+                flags &= ~FLAG_WINDOW_MAXIMIZED;
+            }
+        }
     }
 
     if (mode == 1)
@@ -2123,24 +2245,24 @@ static unsigned SanitizeFlags(int mode, unsigned flags)
 // window. This function will continue to perform these update operations so long as
 // the state continues to change
 //
-// This design takes care of many odd corner cases. For example, if you want to restore
-// a window that was previously maximized AND minimized and you want to remove both these
-// flags, you actually need to call ShowWindow with SW_RESTORE twice. Another example is
-// if you have a maximized window, if the undecorated flag is modified then we'd need to
-// update the window style, but updating the style would mean the window size would change
-// causing the window to lose its Maximized state which would mean we'd need to update the
-// window size and then update the window style a second time to restore that maximized
+// This design takes care of many odd corner cases. For example, in case of restoring
+// a window that was previously maximized AND minimized and those two flags need to be removed,
+// ShowWindow with SW_RESTORE twice need to be actually calleed. Another example is
+// wheen having a maximized window, if the undecorated flag is modified then the window style
+// needs to be updated, but updating the style would mean the window size would change
+// causing the window to lose its Maximized state which would mean the window size
+// needs to be updated, followed by the update of window style, a second time, to restore that maximized
 // state. This implementation is able to handle any/all of these special situations with a
-// retry loop that continues until we either reach the desired state or the state stops changing
+// retry loop that continues until either the desired state is reached or the state stops changing
 static void UpdateFlags(HWND hwnd, unsigned desiredFlags, int width, int height)
 {
-    // Flags that just apply immediately without needing any operations
+    // Flags that apply immediately without needing any operations
     CORE.Window.flags |= (desiredFlags & FLAG_MASK_NO_UPDATE);
 
-    int vsync = (CORE.Window.flags & FLAG_VSYNC_HINT)? 1 : 0;
+    int vsync = (desiredFlags & FLAG_VSYNC_HINT)? 1 : 0;
     if (wglSwapIntervalEXT)
     {
-        (*wglSwapIntervalEXT)(vsync);
+        wglSwapIntervalEXT(vsync);
         if (vsync) CORE.Window.flags |= FLAG_VSYNC_HINT;
         else CORE.Window.flags &= ~FLAG_VSYNC_HINT;
     }

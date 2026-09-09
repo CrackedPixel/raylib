@@ -20,9 +20,8 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"                 // Required for GUI controls
 
-#include <string.h>                 // Required for: strcpy()
-
-#define MAX_FILEPATH_SIZE       2048
+#define MAX_FILEPATH_SIZE       1024
+#define FILE_FILTER             "DIRS*;.png;.c"
 
 //------------------------------------------------------------------------------------
 // Program main entry point
@@ -39,9 +38,17 @@ int main(void)
     char directory[MAX_FILEPATH_SIZE] = { 0 };
     strcpy(directory, GetWorkingDirectory());
 
-    FilePathList files = LoadDirectoryFiles(directory);
+    // Load file-paths on current working directory
+    // NOTE: LoadDirectoryFiles() loads files and directories by default,
+    // use LoadDirectoryFilesEx() for custom filters and recursive directories loading
+    //FilePathList files = LoadDirectoryFiles(directory);
+    FilePathList files = LoadDirectoryFilesEx(directory, FILE_FILTER, false);
 
     int btnBackPressed = false;
+
+    int listScrollIndex = 0;
+    int listItemActive = -1;
+    int listItemFocused = -1;
 
     SetTargetFPS(60);
     //--------------------------------------------------------------------------------------
@@ -53,12 +60,25 @@ int main(void)
         //----------------------------------------------------------------------------------
         if (btnBackPressed)
         {
-            strcpy(directory, GetPrevDirectoryPath(directory));
+            TextCopy(directory, GetPrevDirectoryPath(directory));
             UnloadDirectoryFiles(files);
-            files = LoadDirectoryFiles(directory);
+            files = LoadDirectoryFilesEx(directory, FILE_FILTER, false);
+
+            listScrollIndex = 0;
+            listItemActive = -1;
+            listItemFocused = -1;
         }
 
+        if ((listItemActive >= 0) && (listItemActive < (int)files.count) && DirectoryExists(files.paths[listItemActive]))
+        {
+            TextCopy(directory, files.paths[listItemActive]);
+            UnloadDirectoryFiles(files);
+            files = LoadDirectoryFilesEx(directory, FILE_FILTER, false);
 
+            listScrollIndex = 0;
+            listItemActive = -1;
+            listItemFocused = -1;
+        }
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -66,27 +86,16 @@ int main(void)
         BeginDrawing();
             ClearBackground(RAYWHITE);
 
-            DrawText(directory, 100, 40, 20, DARKGRAY);
+            btnBackPressed = GuiButton((Rectangle){ 40.0f, 10.0f, 48, 28 }, "<");
 
-            btnBackPressed = GuiButton((Rectangle){ 40.0f, 40.0f, 20, 20 }, "<");
-            
-            for (int i = 0; i < (int)files.count; i++)
-            {
-                Color color = Fade(LIGHTGRAY, 0.3f);
+            GuiSetStyle(DEFAULT, TEXT_SIZE, GuiGetFont().baseSize*2);
+            GuiLabel((Rectangle){ 40 + 48 + 10, 10, 700, 28 }, directory);
+            GuiSetStyle(DEFAULT, TEXT_SIZE, GuiGetFont().baseSize);
 
-                if (!IsPathFile(files.paths[i]))
-                {
-                    if (GuiButton((Rectangle){0.0f, 85.0f + 40.0f*(float)i, screenWidth, 40}, ""))
-                    {
-                        strcpy(directory, files.paths[i]);
-                        UnloadDirectoryFiles(files);
-                        files = LoadDirectoryFiles(directory);
-                    }
-                }
-
-                DrawRectangle(0, 85 + 40*i, screenWidth, 40, color);
-                DrawText(GetFileName(files.paths[i]), 120, 100 + 40*i, 10, GRAY);
-            }
+            GuiSetStyle(LISTVIEW, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
+            GuiSetStyle(LISTVIEW, TEXT_PADDING, 40);
+            GuiListViewEx((Rectangle){ 0, 50, (float)GetScreenWidth(), (float)GetScreenHeight() - 50 },
+                files.paths, files.count, &listScrollIndex, &listItemActive, &listItemFocused);
 
         EndDrawing();
         //----------------------------------------------------------------------------------

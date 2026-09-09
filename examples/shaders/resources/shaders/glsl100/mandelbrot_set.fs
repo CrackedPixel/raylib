@@ -34,7 +34,7 @@ void main()
     // Fc(z) = z^2 + c on the complex numbers c from the plane does not diverge to infinity starting at z = 0
     // Here: z = a + bi. Iterations: z -> z^2 + c = (a + bi)^2 + (c.x + c.yi) = (a^2 - b^2 + c.x) + (2ab + c.y)i
 
-    for (int iter = 0; iter < maxIterationsLimit; ++iter)
+    for (int iter = 0; iter < maxIterationsLimit; iter++)
     {
         float aa = a*a;
         float bb = b*b;
@@ -48,7 +48,7 @@ void main()
             float normR = float(iter - (iter/55)*55)/55.0;
             float normG = float(iter - (iter/69)*69)/69.0;
             float normB = float(iter - (iter/40)*40)/40.0;
-        
+
             gl_FragColor = vec4(sin(normR*PI), sin(normG*PI), sin(normB*PI), 1.0);
             return;
         }

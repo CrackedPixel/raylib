@@ -9,10 +9,10 @@
      - struct AliasInfo
      - struct EnumInfo
      - struct FunctionInfo
-     
+
     WARNING: This parser is specifically designed to work with raylib.h, and has some contraints
     in that regards. Still, it can also work with other header files that follow same file structure
-    conventions as raylib.h: rlgl.h, raymath.h, raygui.h, reasings.h 
+    conventions as raylib.h: rlgl.h, raymath.h, raygui.h, reasings.h
 
     CONSTRAINTS:
     This parser is specifically designed to work with raylib.h, so, it has some constraints:
@@ -52,7 +52,7 @@
     raylib-parser is licensed under an unmodified zlib/libpng license, which is an OSI-certified,
     BSD-like license that allows static linking with closed source software:
 
-    Copyright (c) 2021-2025 Ramon Santamaria (@raysan5)
+    Copyright (c) 2021-2026 Ramon Santamaria (@raysan5)
 
 **********************************************************************************************/
 
@@ -146,7 +146,7 @@ typedef struct FunctionInfo {
 } FunctionInfo;
 
 // Output format for parsed data
-typedef enum { DEFAULT = 0, JSON, XML, LUA, CODE } OutputFormat;
+typedef enum { DEFAULT = 0, JSON, XML, LUA, SEXPR, CODE } OutputFormat;
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
@@ -198,11 +198,11 @@ static void ExportParsedData(const char *fileName, int format); // Export parsed
 //----------------------------------------------------------------------------------
 // Program main entry point
 //----------------------------------------------------------------------------------
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     if (argc > 1) ProcessCommandLine(argc, argv);
 
-    const char *raylibhPath = "../src/raylib.h\0";
+    const char *raylibhPath = "../../src/raylib.h\0";
     const char *raylibapiPath = "raylib_api.txt\0";
     const char *rlapiPath = "RLAPI\0";
     if (inFileName[0] == '\0') MemoryCopy(inFileName, raylibhPath, TextLength(raylibhPath) + 1);
@@ -260,8 +260,9 @@ int main(int argc, char* argv[])
     for (int i = 0; i < lineCount; i++)
     {
         int j = 0;
-        while ((lines[i][j] == ' ') || (lines[i][j] == '\t')) j++; // skip spaces and tabs in the begining
-        // Read define line
+        while ((lines[i][j] == ' ') || (lines[i][j] == '\t')) j++; // Skip spaces and tabs in the beginning
+
+        // Read one define line
         if (IsTextEqual(lines[i]+j, "#define ", 8))
         {
             // Keep the line position in the array of lines,
@@ -289,8 +290,10 @@ int main(int argc, char* argv[])
                     if (v == '{') validStruct = true;
                     if ((v == '{') || (v == ';') || (v == '\0')) break;
                 }
+
+                continue;
             }
-            if (!validStruct) continue;
+
             structLines[structCount] = i;
             while (lines[i][0] != '}') i++;
             while (lines[i][0] != '\0') i++;
@@ -314,7 +317,9 @@ int main(int argc, char* argv[])
                 if ((v == ';') && (spaceCount == 2)) validAlias = true;
                 if ((v == ';') || (v == '(') || (v == '\0')) break;
             }
+
             if (!validAlias) continue;
+
             aliasLines[aliasCount] = i;
             aliasCount++;
         }
@@ -385,7 +390,7 @@ int main(int argc, char* argv[])
         char *linePtr = lines[defineLines[i]];
         int j = 0;
 
-        while ((linePtr[j] == ' ') || (linePtr[j] == '\t')) j++; // Skip spaces and tabs in the begining
+        while ((linePtr[j] == ' ') || (linePtr[j] == '\t')) j++; // Skip spaces and tabs in the beginning
         j += 8;                                                  // Skip "#define "
         while ((linePtr[j] == ' ') || (linePtr[j] == '\t')) j++; // Skip spaces and tabs after "#define "
 
@@ -444,6 +449,7 @@ int main(int argc, char* argv[])
                       (ch == '-'))) isNumber = false;
                 j++;
             }
+
             if (isNumber)
             {
                 if (isFloat)
@@ -600,6 +606,7 @@ int main(int argc, char* argv[])
 
         defineIndex++;
     }
+
     defineCount = defineIndex;
     free(defineLines);
 
@@ -614,7 +621,7 @@ int main(int argc, char* argv[])
         GetDescription(linesPtr[-1], structs[i].desc);
 
         // Get struct name: typedef struct name {
-        const int TDS_LEN = 15; // length of "typedef struct "
+        const int TDS_LEN = 15; // Length of "typedef struct "
         for (int c = TDS_LEN; c < 64 + TDS_LEN; c++)
         {
             if ((linesPtr[0][c] == '{') || (linesPtr[0][c] == ' '))
@@ -640,8 +647,6 @@ int main(int argc, char* argv[])
 
                 if ((fieldLine[0] != '/') && !IsTextEqual(fieldLine, "struct", 6)) // Field line is not a comment and not a struct declaration
                 {
-                    //printf("Struct field: %s_\n", fieldLine);     // OK!
-
                     // Get struct field type and name
                     GetDataTypeAndName(fieldLine, fieldEndPos, structs[i].fieldType[structs[i].fieldCount], structs[i].fieldName[structs[i].fieldCount]);
 
@@ -721,7 +726,8 @@ int main(int argc, char* argv[])
                             char v = structs[i].fieldType[originalIndex][k];
                             if ((v == '*') || (v == ' ') || (v == ','))
                             {
-                                if (nameEnd != -1) {
+                                if (nameEnd != -1)
+                                {
                                     // Don't copy to last additional field
                                     if (fieldsRemaining != additionalFields)
                                     {
@@ -773,14 +779,22 @@ int main(int argc, char* argv[])
         // Skip "typedef "
         int c = 8;
 
-        // Type
+        // Type word part
         int typeStart = c;
         while(linePtr[c] != ' ') c++;
         int typeLen = c - typeStart;
-        MemoryCopy(aliases[i].type, &linePtr[typeStart], typeLen);
 
         // Skip space
         c++;
+
+        // Maybe type pointer part
+        if (linePtr[c] == '*')
+        {
+            while(linePtr[c] == '*') c++;
+            typeLen = c - typeStart;
+        }
+
+        MemoryCopy(aliases[i].type, &linePtr[typeStart], typeLen);
 
         // Name
         int nameStart = c;
@@ -1011,9 +1025,7 @@ int main(int argc, char* argv[])
                     ((linePtr[c - 4] == 'v') &&
                      (linePtr[c - 3] == 'o') &&
                      (linePtr[c - 2] == 'i') &&
-                     (linePtr[c - 1] == 'd'))) {
-                  break;
-                }
+                     (linePtr[c - 1] == 'd'))) break;
 
                 // Get parameter type + name, extract info
                 char funcParamTypeName[128] = { 0 };
@@ -1060,6 +1072,7 @@ int main(int argc, char* argv[])
     else if (outputFormat == JSON) printf("\nOutput format:    JSON\n\n");
     else if (outputFormat == XML) printf("\nOutput format:    XML\n\n");
     else if (outputFormat == LUA) printf("\nOutput format:    LUA\n\n");
+    else if (outputFormat == SEXPR) printf("\nOutput format:    SEXPR\n\n");
     else if (outputFormat == CODE) printf("\nOutput format:    CODE\n\n");
 
     ExportParsedData(outFileName, outputFormat);
@@ -1084,7 +1097,7 @@ static void ShowCommandLineInfo(void)
     printf("//                                                                              //\n");
     printf("// more info and bugs-report: github.com/raysan5/raylib/tools/rlparser          //\n");
     printf("//                                                                              //\n");
-    printf("// Copyright (c) 2021-2025 Ramon Santamaria (@raysan5)                          //\n");
+    printf("// Copyright (c) 2021-2026 Ramon Santamaria (@raysan5)                          //\n");
     printf("//                                                                              //\n");
     printf("//////////////////////////////////////////////////////////////////////////////////\n\n");
 
@@ -1096,10 +1109,10 @@ static void ShowCommandLineInfo(void)
     printf("    -i, --input <filename.h>        : Define input header file to parse.\n");
     printf("                                      NOTE: If not specified, defaults to: raylib.h\n\n");
     printf("    -o, --output <filename.ext>     : Define output file and format.\n");
-    printf("                                      Supported extensions: .txt, .json, .xml, .lua, .h\n");
+    printf("                                      Supported extensions: .txt, .json, .xml, .lua, .sexpr, .h\n");
     printf("                                      NOTE: If not specified, defaults to: raylib_api.txt\n\n");
     printf("    -f, --format <type>             : Define output format for parser data.\n");
-    printf("                                      Supported types: DEFAULT, JSON, XML, LUA, CODE\n\n");
+    printf("                                      Supported types: DEFAULT, JSON, XML, LUA, SEXPR, CODE\n\n");
     printf("    -d, --define <DEF>              : Define functions specifiers (i.e. RLAPI for raylib.h, RMAPI for raymath.h, etc.)\n");
     printf("                                      NOTE: If no specifier defined, defaults to: RLAPI\n\n");
     printf("    -t, --truncate <after>          : Define string to truncate input after (i.e. \"RLGL IMPLEMENTATION\" for rlgl.h)\n");
@@ -1152,7 +1165,8 @@ static void ProcessCommandLine(int argc, char *argv[])
                 else if (IsTextEqual(argv[i + 1], "JSON\0", 5)) outputFormat = JSON;
                 else if (IsTextEqual(argv[i + 1], "XML\0", 4)) outputFormat = XML;
                 else if (IsTextEqual(argv[i + 1], "LUA\0", 4)) outputFormat = LUA;
-                else if (IsTextEqual(argv[i + 1], "CODE\0", 4)) outputFormat = CODE;
+                else if (IsTextEqual(argv[i + 1], "SEXPR\0", 4)) outputFormat = SEXPR;
+                else if (IsTextEqual(argv[i + 1], "CODE\0", 5)) outputFormat = CODE;
             }
             else printf("WARNING: No format parameters provided\n");
         }
@@ -2005,6 +2019,131 @@ static void ExportParsedData(const char *fileName, int format)
             fprintf(outFile, "  }\n");
             fprintf(outFile, "}\n");
         } break;
+        case SEXPR:
+        {
+            fprintf(outFile, "(");
+
+            // Print defines info
+            fprintf(outFile, "(defines\n");
+            for (int i = 0; i < defineCount; i++)
+            {
+                if(i != 0) fprintf(outFile, "\n");
+                fprintf(outFile, "   ((name \"%s\")\n", defines[i].name);
+                fprintf(outFile, "    (type \"%s\")\n", StrDefineType(defines[i].type));
+                if ((defines[i].type == INT) ||
+                    (defines[i].type == LONG) ||
+                    (defines[i].type == FLOAT) ||
+                    (defines[i].type == DOUBLE) ||
+                    (defines[i].type == STRING))
+                {
+                    fprintf(outFile, "    (value %s)\n", defines[i].value);
+                }
+                else
+                {
+                    fprintf(outFile, "    (value \"%s\")\n", defines[i].value);
+                }
+                fprintf(outFile, "    (description \"%s\"))", defines[i].desc);
+            }
+            fprintf(outFile, ")\n\n");
+
+            // Print structs info
+            fprintf(outFile, " (structs\n");
+            for (int i = 0; i < structCount; i++)
+            {
+                if(i != 0) fprintf(outFile, "\n\n");
+                fprintf(outFile, "   ((name \"%s\")\n", structs[i].name);
+                fprintf(outFile, "    (description \"%s\")\n", EscapeBackslashes(structs[i].desc));
+                fprintf(outFile, "    (fields ");
+                for (int f = 0; f < structs[i].fieldCount; f++)
+                {
+                    fprintf(outFile, "\n      ((type \"%s\")\n", structs[i].fieldType[f]);
+                    fprintf(outFile, "       (name \"%s\")\n", structs[i].fieldName[f]);
+                    fprintf(outFile, "       (description \"%s\"))", EscapeBackslashes(structs[i].fieldDesc[f]));
+                }
+                fprintf(outFile, "))");
+            }
+            fprintf(outFile, ")\n\n");
+
+            // Print aliases info
+            fprintf(outFile, "  (aliases\n");
+            for (int i = 0; i < aliasCount; i++)
+            {
+                if(i != 0) fprintf(outFile, "\n\n");
+                fprintf(outFile, "    ((type \"%s\")\n", aliases[i].type);
+                fprintf(outFile, "     (name \"%s\")\n", aliases[i].name);
+                fprintf(outFile, "     (description \"%s\"))", aliases[i].desc);
+            }
+            fprintf(outFile, ")\n\n");
+
+            // Print enums info
+            fprintf(outFile, "  (enums\n");
+            for (int i = 0; i < enumCount; i++)
+            {
+                if(i != 0) fprintf(outFile, "\n\n");
+                fprintf(outFile, "    ((name \"%s\")\n", enums[i].name);
+                fprintf(outFile, "     (description \"%s\")\n", EscapeBackslashes(enums[i].desc));
+                fprintf(outFile, "     (values\n");
+                for (int e = 0; e < enums[i].valueCount; e++)
+                {
+                    if(e != 0) fprintf(outFile, "\n\n");
+                    fprintf(outFile, "       ((name \"%s\")\n", enums[i].valueName[e]);
+                    fprintf(outFile, "        (value %i)\n", enums[i].valueInteger[e]);
+                    fprintf(outFile, "        (description \"%s\"))", EscapeBackslashes(enums[i].valueDesc[e]));
+                }
+                fprintf(outFile, "))");
+            }
+            fprintf(outFile, ")\n\n");
+
+            // Print callbacks info
+            fprintf(outFile, "  (callbacks\n");
+            for (int i = 0; i < callbackCount; i++)
+            {
+                if(i != 0) fprintf(outFile, "\n\n");
+                fprintf(outFile, "    ((name \"%s\")\n", callbacks[i].name);
+                fprintf(outFile, "     (description \"%s\")\n", EscapeBackslashes(callbacks[i].desc));
+                fprintf(outFile, "     (return-type \"%s\")", callbacks[i].retType);
+
+                if (callbacks[i].paramCount == 0) fprintf(outFile, "\n");
+                else
+                {
+                    fprintf(outFile, "\n     (params\n");
+                    for (int p = 0; p < callbacks[i].paramCount; p++)
+                    {
+                        if(p != 0) fprintf(outFile, "\n");
+                        fprintf(outFile, "       ((type \"%s\") (name \"%s\"))", callbacks[i].paramType[p], callbacks[i].paramName[p]);
+                    }
+                    fprintf(outFile, ")");
+                }
+                fprintf(outFile, ")");
+            }
+            fprintf(outFile, ")\n\n");
+
+            // Print functions info
+            fprintf(outFile, "  (functions\n");
+            for (int i = 0; i < funcCount; i++)
+            {
+                if(i != 0) fprintf(outFile, "\n\n");
+                fprintf(outFile, "    ((name \"%s\")\n", funcs[i].name);
+                fprintf(outFile, "     (description \"%s\")\n", EscapeBackslashes(funcs[i].desc));
+                fprintf(outFile, "     (return-type \"%s\")", funcs[i].retType);
+
+                if (funcs[i].paramCount == 0) fprintf(outFile, "");
+                else
+                {
+                    fprintf(outFile, "\n     (params\n");
+                    for (int p = 0; p < funcs[i].paramCount; p++)
+                    {
+                        if(p != 0) fprintf(outFile, "\n");
+                        fprintf(outFile, "       ((type \"%s\") (name \"%s\"))", funcs[i].paramType[p], funcs[i].paramName[p]);
+                    }
+                    fprintf(outFile, ")");
+                }
+                fprintf(outFile, ")");
+            }
+            fprintf(outFile, ")");
+            fprintf(outFile, ")\n");
+        } break;
+
         case CODE:
         default: break;
     }

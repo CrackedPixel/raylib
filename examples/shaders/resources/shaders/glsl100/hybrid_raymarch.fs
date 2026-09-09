@@ -2,6 +2,9 @@
 
 #extension GL_EXT_frag_depth : enable           //Extension required for writing depth
 #extension GL_OES_standard_derivatives : enable //Extension used for fwidth()
+
+#define ZERO 0
+
 precision mediump float;                // Precision required for OpenGL ES2 (WebGL)
 
 // Input vertex attributes (from vertex shader)
@@ -17,8 +20,6 @@ uniform vec3 camPos;
 uniform vec3 camDir;
 uniform vec2 screenCenter;
 
-#define ZERO 0
-
 // SRC: https://learnopengl.com/Advanced-OpenGL/Depth-testing
 float CalcDepth(in vec3 rd, in float Idist)
 {
@@ -31,12 +32,12 @@ float sdHorseshoe(in vec3 p, in vec2 c, in float r, in float le, vec2 w)
 {
     p.x = abs(p.x);
     float l = length(p.xy);
-    p.xy = mat2(-c.x, c.y, 
+    p.xy = mat2(-c.x, c.y,
               c.y, c.x)*p.xy;
     p.xy = vec2((p.y>0.0 || p.x>0.0)?p.x:l*sign(-c.x),
                 (p.x>0.0)?p.y:l);
     p.xy = vec2(p.x,abs(p.y-r))-vec2(le,0.0);
-    
+
     vec2 q = vec2(length(max(p.xy,0.0)) + min(0.0,max(p.x,p.y)),p.z);
     vec2 d = abs(q) - w;
     return min(max(d.x,d.y),0.0) + length(max(d,0.0));
@@ -55,14 +56,14 @@ float sdSixWayCutHollowSphere(vec3 p, float r, float h, float t)
     }
 
     vec2 q = vec2(length(ap.yz), ap.x);
-    
+
     float w = sqrt(r*r-h*h);
-    
+
     return ((h*q.x<w*q.y) ? length(q-vec2(w,h)) : abs(length(q)-r)) - t;
 }
 
 // SRC: https://iquilezles.org/articles/boxfunctions
-vec2 iBox(in vec3 ro, in vec3 rd, in vec3 rad) 
+vec2 iBox(in vec3 ro, in vec3 rd, in vec3 rad)
 {
     vec3 m = 1.0/rd;
     vec3 n = m*ro;
@@ -109,8 +110,8 @@ vec2 raycast(in vec3 ro, in vec3 rd)
         if (t>tmax) break;
         vec2 h = map(ro+rd*t);
         if (abs(h.x) < (0.0001*t))
-        { 
-            res = vec2(t,h.y); 
+        {
+            res = vec2(t,h.y);
             break;
         }
         t += h.x;
@@ -128,7 +129,7 @@ float calcSoftshadow(in vec3 ro, in vec3 rd, in float mint, in float tmax)
 
     float res = 1.0;
     float t = mint;
-    for (int i=ZERO; i<24; i++)
+    for (int i = ZERO; i < 24; i++)
     {
         float h = map(ro + rd*t).x;
         float s = clamp(8.0*h/t,0.0,1.0);
@@ -145,9 +146,9 @@ float calcSoftshadow(in vec3 ro, in vec3 rd, in float mint, in float tmax)
 vec3 calcNormal(in vec3 pos)
 {
     vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
-    return normalize(e.xyy*map(pos + e.xyy).x + 
-                     e.yyx*map(pos + e.yyx).x + 
-                     e.yxy*map(pos + e.yxy).x + 
+    return normalize(e.xyy*map(pos + e.xyy).x +
+                     e.yyx*map(pos + e.yyx).x +
+                     e.yxy*map(pos + e.yxy).x +
                      e.xxx*map(pos + e.xxx).x);
 }
 
@@ -156,7 +157,7 @@ float calcAO(in vec3 pos, in vec3 nor)
 {
     float occ = 0.0;
     float sca = 1.0;
-    for (int i=ZERO; i<5; i++)
+    for (int i = ZERO; i < 5; i++)
     {
         float h = 0.01 + 0.12*float(i)/4.0;
         float d = map(pos + h*nor).x;
@@ -175,15 +176,15 @@ float checkersGradBox(in vec2 p)
     // analytical integral (box filter)
     vec2 i = 2.0*(abs(fract((p-0.5*w)*0.5)-0.5)-abs(fract((p+0.5*w)*0.5)-0.5))/w;
     // xor pattern
-    return 0.5 - 0.5*i.x*i.y;                  
+    return 0.5 - 0.5*i.x*i.y;
 }
 
 // https://www.shadertoy.com/view/tdS3DG
 vec4 render(in vec3 ro, in vec3 rd)
-{ 
+{
     // background
     vec3 col = vec3(0.7, 0.7, 0.9) - max(rd.y,0.0)*0.3;
-    
+
     // raycast scene
     vec2 res = raycast(ro,rd);
     float t = res.x;
@@ -193,11 +194,11 @@ vec4 render(in vec3 ro, in vec3 rd)
         vec3 pos = ro + t*rd;
         vec3 nor = (m<1.5) ? vec3(0.0,1.0,0.0) : calcNormal(pos);
         vec3 ref = reflect(rd, nor);
-        
-        // material        
+
+        // material
         col = 0.2 + 0.2*sin(m*2.0 + vec3(0.0,1.0,2.0));
         float ks = 1.0;
-        
+
         if (m<1.5)
         {
             float f = checkersGradBox(3.0*pos.xz);
@@ -207,7 +208,7 @@ vec4 render(in vec3 ro, in vec3 rd)
 
         // lighting
         float occ = calcAO(pos, nor);
-        
+
         vec3 lin = vec3(0.0);
 
         // sun
@@ -248,7 +249,7 @@ vec4 render(in vec3 ro, in vec3 rd)
                   dif *= occ;
             lin += col*0.25*dif*vec3(1.00,1.00,1.00);
         }
-        
+
         col = lin;
 
         col = mix(col, vec3(0.7,0.7,0.9), 1.0-exp(-0.0001*t*t*t));
@@ -257,7 +258,8 @@ vec4 render(in vec3 ro, in vec3 rd)
     return vec4(vec3(clamp(col,0.0,1.0)),t);
 }
 
-vec3 CalcRayDir(vec2 nCoord){
+vec3 CalcRayDir(vec2 nCoord)
+{
     vec3 horizontal = normalize(cross(camDir,vec3(.0 , 1.0, .0)));
     vec3 vertical   = normalize(cross(horizontal,camDir));
     return normalize(camDir + horizontal*nCoord.x + vertical*nCoord.y);
@@ -287,6 +289,7 @@ void main()
         color = res.xyz;
         depth = CalcDepth(rd,res.w);
     }
+
     gl_FragColor = vec4(color , 1.0);
     gl_FragDepthEXT = depth;
 }
